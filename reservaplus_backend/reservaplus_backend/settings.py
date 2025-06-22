@@ -1,4 +1,4 @@
-# reservaplus_backend/settings.py - VERSIÓN SIMPLIFICADA
+# reservaplus_backend/settings.py - CON JWT
 
 import os
 from pathlib import Path
@@ -69,7 +69,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'reservaplus_backend.wsgi.application'
 
-# Database - Por ahora SQLite para simplificar
+# Database
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -80,10 +80,11 @@ DATABASES = {
 # Custom User Model
 AUTH_USER_MODEL = 'users.User'
 
-# REST Framework - CONFIGURACIÓN BÁSICA
+# REST Framework - CONFIGURADO PARA JWT
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
+        'core.authentication.JWTAuthentication',  # Tu autenticación JWT personalizada
+        'rest_framework.authentication.SessionAuthentication',  # Fallback
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -95,13 +96,63 @@ REST_FRAMEWORK = {
     ],
 }
 
-# CORS
+# JWT Settings - CONFIGURACIÓN DE TU SISTEMA JWT
+JWT_SECRET_KEY = SECRET_KEY
+JWT_ALGORITHM = 'HS256'
+JWT_ACCESS_TOKEN_LIFETIME = 60 * 15  # 15 minutos
+JWT_REFRESH_TOKEN_LIFETIME = 60 * 24 * 7  # 7 días
+
+# CORS Settings
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOWED_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# CSRF Settings
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000", 
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+# Session settings (para admin y fallback)
+SESSION_COOKIE_SECURE = False
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_AGE = 86400 * 7
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
 # Internationalization
 LANGUAGE_CODE = 'es-cl'
@@ -112,7 +163,11 @@ USE_TZ = True
 # Static files
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+
+# Solo agregar STATICFILES_DIRS si el directorio existe
+static_dir = BASE_DIR / 'static'
+if static_dir.exists():
+    STATICFILES_DIRS = [static_dir]
 
 # Media files
 MEDIA_URL = '/media/'

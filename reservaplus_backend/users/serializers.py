@@ -20,7 +20,7 @@ class UserSerializer(serializers.ModelSerializer):
     """
     full_name = serializers.ReadOnlyField()
     organization_name = serializers.CharField(source='organization.name', read_only=True)
-    organization = serializers.CharField(read_only=True)  # CAMBIADO: como string para pruebas
+    organization = serializers.CharField(read_only=True)  
     
     class Meta:
         model = User
