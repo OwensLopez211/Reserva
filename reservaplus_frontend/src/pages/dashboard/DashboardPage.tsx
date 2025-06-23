@@ -1,10 +1,13 @@
-// src/pages/dashboard/DashboardPage.tsx - VERSIÓN ORIGINAL SIMPLE
+// src/pages/dashboard/DashboardPage.tsx - Actualizado con progreso de setup
 import React from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { Calendar, Users, Clock, TrendingUp } from 'lucide-react'
+import { SetupProgress } from '../../components/common/SetupProgress'
+import { useOrganizationSetup } from '../../hooks/useOrganizationSetup'
 
-const DashboardPage: React.FC = () => {
+export const DashboardPage: React.FC = () => {
   const { user } = useAuth()
+  const { isSetupComplete } = useOrganizationSetup()
 
   const stats = [
     {
@@ -77,6 +80,9 @@ const DashboardPage: React.FC = () => {
           {user?.organization_name}
         </p>
       </div>
+
+      {/* Progreso de configuración (si no está completo) */}
+      {!isSetupComplete && <SetupProgress />}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
