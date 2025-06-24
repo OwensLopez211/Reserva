@@ -120,15 +120,6 @@ const PricingHeroSection: React.FC<PricingHeroSectionProps> = ({
             </div>
           </div>
 
-          {/* Special offer banner */}
-          <div className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-sm rounded-2xl border border-yellow-500/30 max-w-lg mx-auto">
-            <Sparkles className="w-5 h-5 text-yellow-400 mr-3" />
-            <div className="text-left">
-              <div className="text-yellow-300 font-semibold text-sm">OFERTA DE LANZAMIENTO</div>
-              <div className="text-white text-sm">Primeros 100 clientes - 50% descuento por 3 meses</div>
-            </div>
-          </div>
-
           {/* Scroll indicator */}
           <div className="pt-16">
             <button

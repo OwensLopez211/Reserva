@@ -1,12 +1,12 @@
-// src/App.tsx - Con transiciones mejoradas
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+// src/App.tsx - LIMPIO SIN DOBLE TRANSICIÓN
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { OnboardingProvider } from './contexts/OnboardingContext'
+import { TransitionProvider } from './contexts/TransitionContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import { OnboardingGuard } from './components/onboarding/OnboardingGuard'
 import PublicLayout from './components/layouts/PublicLayout'
 import PrivateLayout from './components/layouts/PrivateLayout'
-import { RouteTransitionWrapper } from './components/transitions/RouteTransitionWrapper'
 
 // Páginas públicas
 import HomePage from './pages/public/HomePage'
@@ -25,7 +25,7 @@ import DashboardPage from './pages/dashboard/DashboardPage'
 
 import './App.css'
 
-// Páginas temporales para las rutas privadas
+// Páginas temporales para las rutas privadas con animaciones
 const ReservasPage = () => (
   <div className="animate-fadeIn">
     <h1 className="text-3xl font-bold text-gray-900">Mis Reservas</h1>
@@ -54,7 +54,7 @@ const ConfiguracionPage = () => (
   </div>
 )
 
-// Páginas legales temporales con transiciones
+// Páginas legales con animaciones mejoradas
 const PrivacyPage = () => (
   <div className="py-16 animate-slideUp">
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -64,6 +64,20 @@ const PrivacyPage = () => (
       <div className="prose prose-lg text-gray-600 animate-fadeIn delay-400">
         <p>Última actualización: Enero 2025</p>
         <p>Tu privacidad es importante para nosotros. Esta política describe cómo recopilamos, usamos y protegemos tu información.</p>
+        <div className="mt-8 space-y-6">
+          <section>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Información que recopilamos</h2>
+            <p>Recopilamos información que nos proporcionas directamente, como cuando creas una cuenta, configuras tu perfil o contactas con nosotros.</p>
+          </section>
+          <section>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Cómo usamos tu información</h2>
+            <p>Utilizamos la información para proporcionar, mantener y mejorar nuestros servicios, así como para comunicarnos contigo.</p>
+          </section>
+          <section>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Protección de datos</h2>
+            <p>Implementamos medidas de seguridad técnicas y organizativas apropiadas para proteger tu información personal.</p>
+          </section>
+        </div>
       </div>
     </div>
   </div>
@@ -78,6 +92,81 @@ const TermsPage = () => (
       <div className="prose prose-lg text-gray-600 animate-fadeIn delay-400">
         <p>Última actualización: Enero 2025</p>
         <p>Al usar Reserva+, aceptas estos términos de servicio.</p>
+        <div className="mt-8 space-y-6">
+          <section>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Aceptación de términos</h2>
+            <p>Al acceder y utilizar este servicio, aceptas estar sujeto a estos términos y condiciones.</p>
+          </section>
+          <section>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Uso del servicio</h2>
+            <p>Te comprometes a utilizar el servicio de manera legal y de acuerdo con estos términos.</p>
+          </section>
+          <section>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Limitaciones</h2>
+            <p>El servicio se proporciona "tal como está" sin garantías de ningún tipo.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+)
+
+const ContactPage = () => (
+  <div className="py-16 animate-slideUp">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center animate-fadeIn delay-200">
+        Contáctanos
+      </h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="animate-fadeIn delay-400">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Información de contacto</h2>
+          <div className="space-y-4">
+            <div className="flex items-center">
+              <div className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center mr-3">
+                <span className="text-emerald-600 text-sm">📧</span>
+              </div>
+              <span>hola@reservaplus.com</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center mr-3">
+                <span className="text-emerald-600 text-sm">📱</span>
+              </div>
+              <span>+56 9 1234 5678</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center mr-3">
+                <span className="text-emerald-600 text-sm">📍</span>
+              </div>
+              <span>Santiago, Chile</span>
+            </div>
+          </div>
+        </div>
+        <div className="animate-fadeIn delay-600">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Envíanos un mensaje</h2>
+          <form className="space-y-4">
+            <input
+              type="text"
+              placeholder="Tu nombre"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+            <input
+              type="email"
+              placeholder="Tu email"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+            <textarea
+              rows={4}
+              placeholder="Tu mensaje"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            ></textarea>
+            <button
+              type="submit"
+              className="w-full bg-emerald-500 text-white py-2 rounded-lg hover:bg-emerald-600 transition-colors"
+            >
+              Enviar mensaje
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   </div>
@@ -86,29 +175,48 @@ const TermsPage = () => (
 const HelpPage = () => (
   <div className="py-16 animate-slideUp">
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8 animate-fadeIn delay-200">
+      <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center animate-fadeIn delay-200">
         Centro de Ayuda
       </h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {[
           {
             title: 'Primeros Pasos',
-            description: 'Aprende cómo configurar tu cuenta y empezar a usar Reserva+.'
+            description: 'Aprende cómo configurar tu cuenta y empezar a usar Reserva+.',
+            icon: '🚀'
           },
           {
             title: 'Gestión de Citas',
-            description: 'Todo lo que necesitas saber sobre el calendario y las reservas.'
+            description: 'Todo lo que necesitas saber sobre el calendario y las reservas.',
+            icon: '📅'
           },
           {
             title: 'Clientes y Servicios',
-            description: 'Cómo gestionar tu base de clientes y configurar servicios.'
+            description: 'Cómo gestionar tu base de clientes y configurar servicios.',
+            icon: '👥'
+          },
+          {
+            title: 'Reportes y Analytics',
+            description: 'Comprende tus métricas y genera reportes útiles.',
+            icon: '📊'
+          },
+          {
+            title: 'Configuración Avanzada',
+            description: 'Personaliza Reserva+ según las necesidades de tu negocio.',
+            icon: '⚙️'
+          },
+          {
+            title: 'Soporte Técnico',
+            description: 'Resuelve problemas técnicos y obtén ayuda especializada.',
+            icon: '🛠️'
           }
         ].map((item, index) => (
           <div 
             key={index} 
-            className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-lg transition-all duration-300 transform hover:scale-105 animate-fadeIn"
+            className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-lg transition-all duration-300 transform hover:scale-105 animate-fadeIn cursor-pointer"
             style={{ animationDelay: `${(index + 1) * 200}ms` }}
           >
+            <div className="text-3xl mb-4">{item.icon}</div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">{item.title}</h3>
             <p className="text-gray-600">{item.description}</p>
           </div>
@@ -118,86 +226,78 @@ const HelpPage = () => (
   </div>
 )
 
-// Componente wrapper para rutas con transiciones
-const AnimatedRoutes = () => {
-  const location = useLocation()
-  
-  return (
-    <RouteTransitionWrapper key={location.pathname}>
-      <Routes location={location}>
-        {/* Rutas públicas */}
-        <Route path="/" element={<PublicLayout />}>
-          <Route index element={<HomePage />} />
-          <Route path="features" element={<FeaturesPage />} />
-          <Route path="pricing" element={<PricingPage />} />
-          <Route path="privacy" element={<PrivacyPage />} />
-          <Route path="terms" element={<TermsPage />} />
-          <Route path="help" element={<HelpPage />} />
-        </Route>
-
-        {/* Login fuera del layout público */}
-        <Route path="/login" element={<LoginLayout />} />
-
-        {/* Ruta de onboarding - requiere autenticación pero no onboarding completo */}
-        <Route 
-          path="/onboarding" 
-          element={
-            <ProtectedRoute>
-              <OnboardingPage />
-            </ProtectedRoute>
-          } 
-        />
-
-        {/* Ruta de bienvenida - para usuarios recién registrados */}
-        <Route 
-          path="/welcome" 
-          element={
-            <ProtectedRoute>
-              <OnboardingWelcome />
-            </ProtectedRoute>
-          } 
-        />
-
-        {/* Rutas privadas - requieren autenticación Y onboarding completo */}
-        <Route
-          path="/app"
-          element={
-            <ProtectedRoute>
-              <OnboardingGuard>
-                <PrivateLayout />
-              </OnboardingGuard>
-            </ProtectedRoute>
-          }
-        >
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="reservas" element={<ReservasPage />} />
-          <Route path="clientes" element={<ClientesPage />} />
-          <Route path="perfil" element={<PerfilPage />} />
-          <Route path="configuracion" element={<ConfiguracionPage />} />
-        </Route>
-
-        {/* Rutas de redirección */}
-        <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
-        <Route path="/reservas" element={<Navigate to="/app/reservas" replace />} />
-        <Route path="/clientes" element={<Navigate to="/app/clientes" replace />} />
-        <Route path="/perfil" element={<Navigate to="/app/perfil" replace />} />
-        <Route path="/configuracion" element={<Navigate to="/app/configuracion" replace />} />
-
-        {/* Ruta por defecto */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </RouteTransitionWrapper>
-  )
-}
-
 function App() {
   return (
     <AuthProvider>
       <OnboardingProvider>
         <BrowserRouter>
-          <div className="app-container">
-            <AnimatedRoutes />
-          </div>
+          <TransitionProvider>
+            <div className="app-container">
+              <Routes>
+                {/* Rutas públicas */}
+                <Route path="/" element={<PublicLayout />}>
+                  <Route index element={<HomePage />} />
+                  <Route path="features" element={<FeaturesPage />} />
+                  <Route path="pricing" element={<PricingPage />} />
+                  <Route path="contact" element={<ContactPage />} />
+                  <Route path="privacy" element={<PrivacyPage />} />
+                  <Route path="terms" element={<TermsPage />} />
+                  <Route path="help" element={<HelpPage />} />
+                </Route>
+
+                {/* Login fuera del layout público */}
+                <Route path="/login" element={<LoginLayout />} />
+
+                {/* Ruta de onboarding - requiere autenticación pero no onboarding completo */}
+                <Route 
+                  path="/onboarding" 
+                  element={
+                    <ProtectedRoute>
+                      <OnboardingPage />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                {/* Ruta de bienvenida - para usuarios recién registrados */}
+                <Route 
+                  path="/welcome" 
+                  element={
+                    <ProtectedRoute>
+                      <OnboardingWelcome />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                {/* Rutas privadas - requieren autenticación Y onboarding completo */}
+                <Route
+                  path="/app"
+                  element={
+                    <ProtectedRoute>
+                      <OnboardingGuard>
+                        <PrivateLayout />
+                      </OnboardingGuard>
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="dashboard" element={<DashboardPage />} />
+                  <Route path="reservas" element={<ReservasPage />} />
+                  <Route path="clientes" element={<ClientesPage />} />
+                  <Route path="perfil" element={<PerfilPage />} />
+                  <Route path="configuracion" element={<ConfiguracionPage />} />
+                </Route>
+
+                {/* Rutas de redirección */}
+                <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
+                <Route path="/reservas" element={<Navigate to="/app/reservas" replace />} />
+                <Route path="/clientes" element={<Navigate to="/app/clientes" replace />} />
+                <Route path="/perfil" element={<Navigate to="/app/perfil" replace />} />
+                <Route path="/configuracion" element={<Navigate to="/app/configuracion" replace />} />
+
+                {/* Ruta por defecto */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </div>
+          </TransitionProvider>
         </BrowserRouter>
       </OnboardingProvider>
     </AuthProvider>

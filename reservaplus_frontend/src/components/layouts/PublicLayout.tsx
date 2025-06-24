@@ -1,50 +1,12 @@
-// src/components/layouts/PublicLayout.tsx
-import React, { useEffect, useState, useRef } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+// src/components/layouts/PublicLayout.tsx - OPTIMIZADO
+import React from 'react'
+import { Outlet } from 'react-router-dom'
 import Navbar from '../common/Navbar'
 import Footer from '../common/Footer'
+import { useTransition } from '../../contexts/TransitionContext'
 
 const PublicLayout: React.FC = () => {
-  const location = useLocation()
-  const [isLoading, setIsLoading] = useState(false)
-  const [displayLocation, setDisplayLocation] = useState(location)
-  const [transitionStage, setTransitionStage] = useState('fadeIn')
-  const prevPathRef = useRef(location.pathname)
-  const isInitialMount = useRef(true)
-
-  useEffect(() => {
-    // Evitar transición en el primer mount
-    if (isInitialMount.current) {
-      isInitialMount.current = false
-      return
-    }
-
-    // Solo ejecutar transición si la ruta realmente cambió
-    if (location.pathname !== prevPathRef.current) {
-      console.log('🔄 Route transition:', prevPathRef.current, '→', location.pathname)
-      
-      // Scroll to top al cambiar página
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-      
-      // Fase 1: Fade out
-      setTransitionStage('fadeOut')
-      setIsLoading(true)
-      
-      // Fase 2: Cambiar contenido y fade in
-      const timer = setTimeout(() => {
-        setDisplayLocation(location)
-        setTransitionStage('fadeIn')
-        prevPathRef.current = location.pathname
-        
-        // Fase 3: Terminar loading
-        setTimeout(() => {
-          setIsLoading(false)
-        }, 150)
-      }, 300)
-
-      return () => clearTimeout(timer)
-    }
-  }, [location.pathname])
+  const { isTransitioning, transitionStage, currentPath } = useTransition()
 
   const getTransitionClasses = () => {
     const baseClasses = 'transition-all duration-500 ease-out'
@@ -53,6 +15,8 @@ const PublicLayout: React.FC = () => {
       case 'fadeOut':
         return `${baseClasses} opacity-0 transform translate-y-8 scale-98 filter blur-sm`
       case 'fadeIn':
+        return `${baseClasses} opacity-100 transform translate-y-0 scale-100 filter blur-0`
+      case 'idle':
       default:
         return `${baseClasses} opacity-100 transform translate-y-0 scale-100 filter blur-0`
     }
@@ -63,29 +27,29 @@ const PublicLayout: React.FC = () => {
       
       {/* Loading Overlay */}
       <div className={`fixed inset-0 z-50 pointer-events-none transition-all duration-300 ${
-        isLoading 
+        isTransitioning 
           ? 'opacity-100 backdrop-blur-sm' 
           : 'opacity-0'
       }`}>
-        <div className="absolute inset-0 bg-gradient-to-br from-white/80 to-gray-50/80"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-white/90 to-gray-50/90"></div>
         <div className="absolute inset-0 flex items-center justify-center">
           <div className={`transition-all duration-300 ${
-            isLoading ? 'scale-100 opacity-100' : 'scale-75 opacity-0'
+            isTransitioning ? 'scale-100 opacity-100' : 'scale-75 opacity-0'
           }`}>
             <div className="relative">
               {/* Spinner principal */}
               <div className="w-12 h-12 border-4 border-emerald-200 border-t-emerald-500 rounded-full animate-spin"></div>
               {/* Spinner secundario */}
               <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-b-cyan-400 rounded-full animate-spin" 
-                   style={{ animationDirection: 'reverse' }}></div>
+                   style={{ animationDirection: 'reverse', animationDuration: '0.8s' }}></div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div className={`fixed top-0 left-0 h-1 bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500 z-50 transition-all duration-300 ${
-        isLoading ? 'w-full' : 'w-0'
+      <div className={`fixed top-0 left-0 h-1 bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500 z-50 transition-all duration-500 ${
+        transitionStage === 'fadeOut' ? 'w-full' : 'w-0'
       }`} />
 
       {/* Header/Navbar */}
@@ -97,20 +61,20 @@ const PublicLayout: React.FC = () => {
       <main className="flex-1 relative">
         
         {/* Efectos de fondo animados por página */}
-        <PageBackground currentPath={displayLocation.pathname} />
+        <PageBackground currentPath={currentPath} isTransitioning={isTransitioning} />
         
         {/* Container de transición */}
         <div className={getTransitionClasses()}>
           {/* Contenido de la página */}
           <div className="relative z-10">
-            <Outlet key={displayLocation.pathname} />
+            <Outlet />
           </div>
         </div>
       </main>
 
       {/* Footer con animación */}
       <div className={`relative z-40 transition-all duration-700 delay-200 ${
-        isLoading 
+        isTransitioning 
           ? 'opacity-0 transform translate-y-4' 
           : 'opacity-100 transform translate-y-0'
       }`}>
@@ -118,24 +82,16 @@ const PublicLayout: React.FC = () => {
       </div>
 
       {/* Efectos de partículas de transición */}
-      <TransitionParticles isTransitioning={isLoading} />
+      <TransitionParticles isTransitioning={isTransitioning} currentPath={currentPath} />
     </div>
   )
 }
 
 // Componente para efectos de fondo específicos por página
-const PageBackground: React.FC<{ currentPath: string }> = ({ currentPath }) => {
-  const [isVisible, setIsVisible] = useState(false)
-
-  useEffect(() => {
-    // Delay para que aparezca después del contenido
-    setIsVisible(false)
-    const timer = setTimeout(() => setIsVisible(true), 400)
-    return () => {
-      clearTimeout(timer)
-    }
-  }, [currentPath])
-
+const PageBackground: React.FC<{ 
+  currentPath: string
+  isTransitioning: boolean 
+}> = ({ currentPath, isTransitioning }) => {
   const getBackgroundEffects = () => {
     switch (currentPath) {
       case '/':
@@ -159,6 +115,13 @@ const PageBackground: React.FC<{ currentPath: string }> = ({ currentPath }) => {
             <div className="absolute bottom-32 left-20 w-64 h-64 bg-green-400/5 rounded-full blur-3xl animate-pulse delay-500"></div>
           </div>
         )
+      case '/contact':
+        return (
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-20 left-20 w-72 h-72 bg-purple-400/5 rounded-full blur-3xl animate-pulse"></div>
+            <div className="absolute bottom-20 right-20 w-64 h-64 bg-pink-400/5 rounded-full blur-3xl animate-pulse delay-800"></div>
+          </div>
+        )
       default:
         return (
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -170,7 +133,7 @@ const PageBackground: React.FC<{ currentPath: string }> = ({ currentPath }) => {
 
   return (
     <div className={`absolute inset-0 transition-opacity duration-1000 ${
-      isVisible ? 'opacity-100' : 'opacity-0'
+      isTransitioning ? 'opacity-50' : 'opacity-100'
     }`}>
       {getBackgroundEffects()}
     </div>
@@ -178,39 +141,44 @@ const PageBackground: React.FC<{ currentPath: string }> = ({ currentPath }) => {
 }
 
 // Componente para partículas de transición
-const TransitionParticles: React.FC<{ isTransitioning: boolean }> = ({ isTransitioning }) => {
+const TransitionParticles: React.FC<{ 
+  isTransitioning: boolean
+  currentPath: string 
+}> = ({ isTransitioning, currentPath }) => {
   if (!isTransitioning) return null
+
+  // Colores diferentes por página
+  const getParticleColor = () => {
+    switch (currentPath) {
+      case '/':
+        return 'bg-emerald-400'
+      case '/features':
+        return 'bg-blue-400'
+      case '/pricing':
+        return 'bg-yellow-400'
+      case '/contact':
+        return 'bg-purple-400'
+      default:
+        return 'bg-gray-400'
+    }
+  }
 
   return (
     <div className="fixed inset-0 pointer-events-none z-30">
-      {[...Array(8)].map((_, i) => (
+      {[...Array(6)].map((_, i) => (
         <div
           key={i}
-          className="absolute w-2 h-2 bg-emerald-400 rounded-full animate-ping opacity-60"
+          className={`absolute w-2 h-2 ${getParticleColor()} rounded-full animate-ping opacity-60`}
           style={{
             top: `${Math.random() * 100}%`,
             left: `${Math.random() * 100}%`,
-            animationDelay: `${i * 150}ms`,
-            animationDuration: '1.5s'
+            animationDelay: `${i * 200}ms`,
+            animationDuration: `${1 + Math.random() * 0.5}s`
           }}
         />
       ))}
     </div>
   )
-}
-
-// Hook personalizado para transiciones de página
-export const usePageTransition = () => {
-  const location = useLocation()
-  const [isTransitioning, setIsTransitioning] = useState(false)
-
-  useEffect(() => {
-    setIsTransitioning(true)
-    const timer = setTimeout(() => setIsTransitioning(false), 500)
-    return () => clearTimeout(timer)
-  }, [location.pathname])
-
-  return { isTransitioning }
 }
 
 export default PublicLayout
