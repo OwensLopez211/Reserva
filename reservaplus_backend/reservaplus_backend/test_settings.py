@@ -15,15 +15,15 @@ DATABASES = {
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    # ReservaPlus middlewares
+    'core.middleware.SubscriptionLimitsMiddleware',
+    'core.middleware.SubscriptionCounterMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # No incluir los middlewares de suscripción en tests
-    # 'core.middleware.SubscriptionLimitsMiddleware',
-    # 'core.middleware.SubscriptionCounterMiddleware',
 ]
 
 # Logging más silencioso durante tests

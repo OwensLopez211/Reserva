@@ -41,15 +41,16 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    # ReservaPlus middlewares
+    'core.middleware.SubscriptionLimitsMiddleware',
+    'core.middleware.SubscriptionCounterMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # ReservaPlus middlewares
-    'core.middleware.SubscriptionLimitsMiddleware',
-    'core.middleware.SubscriptionCounterMiddleware',
+    
 ]
 
 ROOT_URLCONF = 'reservaplus_backend.urls'
