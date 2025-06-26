@@ -1,13 +1,15 @@
-// src/pages/onboarding/RegistrationPage.tsx
+// src/pages/onboarding/RegistrationPage.tsx - VERSIÓN ACTUALIZADA Y ALINEADA
+
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Check, AlertCircle, User, Building, Mail, Phone, MapPin, Globe } from 'lucide-react'
+import { OnboardingService } from '../../services/onboardingService'
+import { useOnboarding } from '../../contexts/OnboardingContext'
 
 interface RegistrationData {
   // Datos del usuario admin
   firstName: string
   lastName: string
-  username: string
   email: string
   phone: string
   password: string
@@ -39,18 +41,21 @@ interface IndustryOption {
   disabled?: boolean
 }
 
-interface PlanData {
-  planId: string
-  billingCycle: 'monthly' | 'yearly'
-  price: number
+// Definición local mínima del tipo Plan para evitar errores de tipo
+type Plan = {
+  id: string
+  name: string
+  price_monthly: number
+  price_yearly?: number
 }
 
 const RegistrationPage: React.FC = () => {
   const navigate = useNavigate()
+  const { initializeFromToken } = useOnboarding()
+  
   const [formData, setFormData] = useState<RegistrationData>({
     firstName: '',
     lastName: '',
-    username: '',
     email: '',
     phone: '',
     password: '',
@@ -70,15 +75,23 @@ const RegistrationPage: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<ValidationErrors>({})
-  const [selectedPlan, setSelectedPlan] = useState<PlanData | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null)
 
   // Cargar plan seleccionado del paso anterior
   useEffect(() => {
-    const planData = localStorage.getItem('selectedPlan')
-    if (planData) {
-      setSelectedPlan(JSON.parse(planData))
-    } else {
+    const planId = localStorage.getItem('selected_plan_id')
+    const planData = localStorage.getItem('selected_plan_data')
+    
+    if (!planId || !planData) {
       // Si no hay plan seleccionado, volver al paso anterior
+      navigate('/onboarding/plan')
+      return
+    }
+
+    try {
+      setSelectedPlan(JSON.parse(planData))
+    } catch (error) {
+      console.error('Error parsing plan data:', error)
       navigate('/onboarding/plan')
     }
   }, [navigate])
@@ -182,8 +195,8 @@ const RegistrationPage: React.FC = () => {
     }
     if (!formData.password) {
       newErrors.password = ['La contraseña es requerida']
-    } else if (formData.password.length < 8) {
-      newErrors.password = ['La contraseña debe tener al menos 8 caracteres']
+    } else if (formData.password.length < 6) {
+      newErrors.password = ['La contraseña debe tener al menos 6 caracteres']
     }
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = ['Las contraseñas no coinciden']
@@ -217,20 +230,61 @@ const RegistrationPage: React.FC = () => {
       return
     }
 
+    if (!selectedPlan) {
+      setErrors({ submit: ['Error: Plan no seleccionado'] })
+      return
+    }
+
     setIsLoading(true)
     
     try {
-      // Guardar datos de registro para el siguiente paso
-      localStorage.setItem('registrationData', JSON.stringify(formData))
+      console.log('🚀 Iniciando signup con datos:', formData)
+
+      // Usar el servicio actualizado para hacer signup
+      const signupResponse = await OnboardingService.startSignup(
+        selectedPlan.id,
+        {
+          email: formData.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          organization_name: formData.organizationName
+        }
+      )
+
+      console.log('✅ Signup exitoso:', signupResponse)
+
+      // Inicializar el contexto de onboarding con el token
+      const tokenValid = await initializeFromToken(signupResponse.registration_token)
       
-      // Simular llamada a API
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      if (tokenValid) {
+        // Guardar datos adicionales del formulario para usar en pasos posteriores
+        const additionalData = {
+          formData,
+          industryTemplate: formData.industryTemplate,
+          businessInfo: {
+            email: formData.businessEmail,
+            phone: formData.businessPhone,
+            address: formData.address,
+            city: formData.city,
+            country: formData.country
+          }
+        }
+        localStorage.setItem('registration_form_data', JSON.stringify(additionalData))
+
+        // Navegar al siguiente paso
+        navigate('/onboarding/team')
+      } else {
+        setErrors({ submit: ['Error al inicializar el proceso de registro'] })
+      }
       
-      // Navegar al siguiente paso
-      navigate('/onboarding/team')
     } catch (error) {
-      console.error('Error en registro:', error)
-      setErrors({ submit: ['Hubo un error al procesar el registro. Por favor intenta de nuevo.'] })
+      console.error('❌ Error en registro:', error)
+      
+      if (error && typeof error === 'object' && 'message' in error) {
+        setErrors({ submit: [(error as { message: string }).message] })
+      } else {
+        setErrors({ submit: ['Hubo un error al procesar el registro. Por favor intenta de nuevo.'] })
+      }
     } finally {
       setIsLoading(false)
     }
@@ -247,6 +301,9 @@ const RegistrationPage: React.FC = () => {
       </div>
     )
   }
+
+  const billingCycle = localStorage.getItem('selected_billing') || 'monthly'
+  const price = billingCycle === 'monthly' ? selectedPlan.price_monthly : (selectedPlan.price_yearly || selectedPlan.price_monthly * 12)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-blue-50">
@@ -300,9 +357,9 @@ const RegistrationPage: React.FC = () => {
                 <Check className="w-6 h-6 text-emerald-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900">Plan Básico Seleccionado</h3>
+                <h3 className="font-semibold text-gray-900">{selectedPlan.name} Seleccionado</h3>
                 <p className="text-gray-600">
-                  ${selectedPlan.price?.toLocaleString()} {selectedPlan.billingCycle === 'monthly' ? '/mes' : '/año'}
+                  ${price?.toLocaleString()} {billingCycle === 'monthly' ? '/mes' : '/año'}
                   <span className="ml-2 text-emerald-600">• 14 días gratis</span>
                 </p>
               </div>
@@ -374,27 +431,6 @@ const RegistrationPage: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nombre de usuario *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.username}
-                    onChange={(e) => handleInputChange('username', e.target.value)}
-                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                      errors.username ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Ej: juanperez"
-                  />
-                  {errors.username && (
-                    <p className="mt-1 text-sm text-red-600 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.username[0]}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Email Personal *
                   </label>
                   <div className="relative">
@@ -453,7 +489,7 @@ const RegistrationPage: React.FC = () => {
                       className={`w-full px-4 py-3 pr-12 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                         errors.password ? 'border-red-300' : 'border-gray-300'
                       }`}
-                      placeholder="Mínimo 8 caracteres"
+                      placeholder="Mínimo 6 caracteres"
                     />
                     <button
                       type="button"
@@ -554,6 +590,9 @@ const RegistrationPage: React.FC = () => {
                         <div className="text-2xl mb-2">{option.icon}</div>
                         <div className="font-medium text-gray-900 text-sm">{option.label}</div>
                         <div className="text-xs text-gray-500 mt-1">{option.description}</div>
+                        {option.disabled && (
+                          <div className="text-xs text-orange-600 mt-1 font-medium">Próximamente</div>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -675,7 +714,7 @@ const RegistrationPage: React.FC = () => {
                     />
                     <span className="text-sm text-gray-700">
                       Acepto los{' '}
-                      <a href="/terms" className="text-emerald-600 hover:text-emerald-700 font-medium">
+                      <a href="/terms" target="_blank" className="text-emerald-600 hover:text-emerald-700 font-medium">
                         Términos y Condiciones
                       </a>{' '}
                       de uso de la plataforma *
@@ -699,7 +738,7 @@ const RegistrationPage: React.FC = () => {
                     />
                     <span className="text-sm text-gray-700">
                       Acepto la{' '}
-                      <a href="/privacy" className="text-emerald-600 hover:text-emerald-700 font-medium">
+                      <a href="/privacy" target="_blank" className="text-emerald-600 hover:text-emerald-700 font-medium">
                         Política de Privacidad
                       </a>{' '}
                       y el tratamiento de mis datos *

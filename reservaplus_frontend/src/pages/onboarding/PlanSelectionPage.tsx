@@ -1,159 +1,150 @@
-// src/pages/onboarding/PlanSelectionPage.tsx
-import React, { useState } from 'react'
+// src/pages/onboarding/PlanSelectionPage.tsx - VERSIÓN ACTUALIZADA Y ALINEADA
+
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, Star } from 'lucide-react'
 import PricingCard from '../../components/pricing/PricingCard'
+import { OnboardingService } from '../../services/onboardingService'
 
 interface Plan {
   id: string
   name: string
-  monthlyPrice: number
-  yearlyPrice: number
-  originalMonthlyPrice?: number
-  originalYearlyPrice?: number
-  discount?: string
+  price_monthly: number
+  price_yearly?: number
+  original_price?: number
+  discount_text?: string
   description: string
   features: string[]
-  popular: boolean
-  comingSoon?: boolean
-  badge?: string
-  color: 'emerald' | 'blue' | 'purple' | 'gradient'
+  is_popular: boolean
+  is_coming_soon?: boolean
+  badge_text?: string
+  color_scheme: 'emerald' | 'blue' | 'purple' | 'gradient'
 }
 
 const PlanSelectionPage: React.FC = () => {
   const navigate = useNavigate()
   const [selectedBilling, setSelectedBilling] = useState<'monthly' | 'yearly'>('monthly')
-  const [, setSelectedPlan] = useState<string>('basic')
-  const [isLoading, setIsLoading] = useState(false)
+  const [plans, setPlans] = useState<Plan[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const plans: Plan[] = [
-    {
-      id: 'basic',
-      name: 'Básico',
-      monthlyPrice: 29990,
-      yearlyPrice: 299900,
-      originalMonthlyPrice: 59990,
-      originalYearlyPrice: 599900,
-      discount: '50% OFF',
-      description: 'Todo lo que necesitas para profesionalizar tu negocio',
-      features: [
-        '1 Usuario Admin',
-        '1 Recepcionista',
-        '3 Profesionales',
-        '500 citas por mes',
-        '5 GB de almacenamiento',
-        'Calendario inteligente',
-        'Base de datos centralizada',
-        'Notificaciones automáticas',
-        'Panel de control básico',
-        'Soporte personalizado',
-        'Recordatorios por email',
-        '$12.990 por profesional adicional'
-      ],
-      popular: true,
-      badge: 'Disponible Ahora',
-      color: 'gradient'
-    },
-    {
-      id: 'professional',
-      name: 'Profesional',
-      monthlyPrice: 49990,
-      yearlyPrice: 499900,
-      originalMonthlyPrice: 99990,
-      originalYearlyPrice: 999900,
-      discount: '50% OFF',
-      description: 'Para negocios en crecimiento con múltiples servicios',
-      features: [
-        '3 Usuarios Admin',
-        '5 Recepcionistas',
-        '15 Profesionales',
-        '2,000 citas por mes',
-        '25 GB de almacenamiento',
-        'Todas las funciones básicas',
-        'Panel de control avanzado',
-        'Reportes y análisis',
-        'Integraciones básicas',
-        'Soporte prioritario',
-        'Recordatorios SMS',
-        'Multi-ubicación (hasta 3)'
-      ],
-      popular: false,
-      comingSoon: true,
-      color: 'blue'
-    },
-    {
-      id: 'enterprise',
-      name: 'Empresarial',
-      monthlyPrice: 99990,
-      yearlyPrice: 999900,
-      originalMonthlyPrice: 199990,
-      originalYearlyPrice: 1999900,
-      discount: '50% OFF',
-      description: 'Para empresas con múltiples ubicaciones y equipos grandes',
-      features: [
-        'Usuarios Admin ilimitados',
-        'Recepcionistas ilimitadas',
-        'Profesionales ilimitados',
-        'Citas ilimitadas',
-        '100 GB de almacenamiento',
-        'Todas las funciones profesionales',
-        'Multi-ubicación ilimitada',
-        'API personalizada',
-        'Integraciones avanzadas',
-        'Soporte 24/7',
-        'Capacitación personalizada',
-        'Gerente de cuenta dedicado'
-      ],
-      popular: false,
-      comingSoon: true,
-      color: 'purple'
+  // Cargar planes desde el backend
+  useEffect(() => {
+    loadPlans()
+  }, [])
+
+  const loadPlans = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const response = await OnboardingService.getAvailablePlans()
+      console.log('📋 Planes cargados:', response)
+      
+      // Mapear respuesta del backend a formato del frontend
+      const mappedPlans = response.results?.map((plan: Plan) => ({
+        id: plan.id,
+        name: plan.name,
+        price_monthly: plan.price_monthly,
+        price_yearly: plan.price_yearly,
+        original_price: plan.original_price,
+        discount_text: plan.discount_text,
+        description: plan.description,
+        features: plan.features,
+        is_popular: plan.is_popular,
+        is_coming_soon: plan.is_coming_soon,
+        badge_text: plan.badge_text,
+        color_scheme: plan.color_scheme
+      })) || []
+
+      setPlans(mappedPlans)
+    } catch (error) {
+      console.error('❌ Error cargando planes:', error)
+      setError('Error al cargar los planes. Por favor recarga la página.')
+    } finally {
+      setLoading(false)
     }
-  ]
+  }
 
   const handleSelectPlan = async (planId: string) => {
-    setIsLoading(true)
-    setSelectedPlan(planId)
+    // Validar que el plan no esté "coming soon"
+    const selectedPlan = plans.find(p => p.id === planId)
+    if (!selectedPlan) return
+    
+    if (selectedPlan.is_coming_soon) {
+      alert('Este plan estará disponible pronto')
+      return
+    }
+
+    setIsSubmitting(true)
     
     try {
-      const plan = plans.find(p => p.id === planId)
-      if (!plan) return
-
-      const selectedPrice = selectedBilling === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice
-
-      // Guardar plan seleccionado en localStorage para el siguiente paso
-      localStorage.setItem('selectedPlan', JSON.stringify({
-        planId: plan.id,
-        billingCycle: selectedBilling,
-        price: selectedPrice,
-        planName: plan.name
-      }))
+      console.log('🎯 Plan seleccionado:', planId)
       
-      // Navegar al registro
+      // Guardar plan seleccionado temporalmente
+      localStorage.setItem('selected_plan_id', planId)
+      localStorage.setItem('selected_billing', selectedBilling)
+      localStorage.setItem('selected_plan_data', JSON.stringify(selectedPlan))
+      
+      // Navegar directamente al registro
+      // El signup se hará en la página de registro con todos los datos
       navigate('/onboarding/register')
+      
     } catch (error) {
-      console.error('Error al seleccionar plan:', error)
+      console.error('❌ Error al seleccionar plan:', error)
+      setError('Error al seleccionar el plan. Por favor intenta de nuevo.')
     } finally {
-      setIsLoading(false)
+      setIsSubmitting(false)
     }
   }
 
   const formatPrice = (plan: Plan) => {
-    const price = selectedBilling === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice
+    const price = selectedBilling === 'monthly' ? plan.price_monthly : (plan.price_yearly || plan.price_monthly * 12)
     return price.toLocaleString()
   }
 
   const formatOriginalPrice = (plan: Plan) => {
-    if (selectedBilling === 'monthly' && plan.originalMonthlyPrice) {
-      return plan.originalMonthlyPrice.toLocaleString()
+    if (selectedBilling === 'monthly' && plan.original_price) {
+      return plan.original_price.toLocaleString()
     }
-    if (selectedBilling === 'yearly' && plan.originalYearlyPrice) {
-      return plan.originalYearlyPrice.toLocaleString()
+    // Para anual, calcular descuento si existe
+    if (selectedBilling === 'yearly' && plan.price_yearly && plan.price_monthly) {
+      const originalYearly = plan.price_monthly * 12
+      return originalYearly.toLocaleString()
     }
     return undefined
   }
 
   const getPeriod = () => {
     return selectedBilling === 'monthly' ? '/mes' : '/año'
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando planes...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 mb-4">❌ {error}</div>
+          <button 
+            onClick={loadPlans}
+            className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -195,14 +186,14 @@ const PlanSelectionPage: React.FC = () => {
           </div>
           
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4 lg:mb-6">
-            Comienza con nuestro{' '}
+            Elige el plan perfecto{' '}
             <span className="bg-gradient-to-r from-emerald-600 to-cyan-600 bg-clip-text text-transparent">
-              Plan Básico
+              para tu negocio
             </span>
           </h2>
           
           <p className="text-lg lg:text-xl text-gray-600 max-w-2xl mx-auto">
-            Inicia tu transformación digital con todo lo esencial. Más planes llegarán pronto.
+            Comienza tu transformación digital con nuestras herramientas profesionales
           </p>
         </div>
 
@@ -239,51 +230,59 @@ const PlanSelectionPage: React.FC = () => {
 
         {/* Pricing Cards */}
         <div id="pricing-plans" className="mb-8 lg:mb-12">
-          {/* Mobile: Stack vertically */}
-          <div className="block lg:hidden space-y-6">
-            {plans.map((plan) => (
-              <div key={plan.id} className="max-w-sm mx-auto">
-                <PricingCard
-                  name={plan.name}
-                  price={formatPrice(plan)}
-                  originalPrice={formatOriginalPrice(plan)}
-                  period={getPeriod()}
-                  description={plan.description}
-                  features={plan.features}
-                  popular={plan.popular}
-                  comingSoon={plan.comingSoon}
-                  discount={plan.discount}
-                  badge={plan.badge}
-                  color={plan.color}
-                  onGetStarted={() => handleSelectPlan(plan.id)}
-                />
+          {plans.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">No hay planes disponibles en este momento</p>
+            </div>
+          ) : (
+            <>
+              {/* Mobile: Stack vertically */}
+              <div className="block lg:hidden space-y-6">
+                {plans.map((plan) => (
+                  <div key={plan.id} className="max-w-sm mx-auto">
+                    <PricingCard
+                      name={plan.name}
+                      price={formatPrice(plan)}
+                      originalPrice={formatOriginalPrice(plan)}
+                      period={getPeriod()}
+                      description={plan.description}
+                      features={plan.features}
+                      popular={plan.is_popular}
+                      comingSoon={plan.is_coming_soon}
+                      discount={plan.discount_text}
+                      badge={plan.badge_text}
+                      color={plan.color_scheme}
+                      onGetStarted={() => handleSelectPlan(plan.id)}
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          {/* Desktop: Grid layout */}
-          <div className="hidden lg:grid lg:grid-cols-3 gap-6 xl:gap-8">
-            {plans.map((plan) => (
-              <div key={plan.id} className="flex justify-center">
-                <div className="w-full max-w-sm">
-                  <PricingCard
-                    name={plan.name}
-                    price={formatPrice(plan)}
-                    originalPrice={formatOriginalPrice(plan)}
-                    period={getPeriod()}
-                    description={plan.description}
-                    features={plan.features}
-                    popular={plan.popular}
-                    comingSoon={plan.comingSoon}
-                    discount={plan.discount}
-                    badge={plan.badge}
-                    color={plan.color}
-                    onGetStarted={() => handleSelectPlan(plan.id)}
-                  />
-                </div>
+              {/* Desktop: Grid layout */}
+              <div className="hidden lg:grid lg:grid-cols-3 gap-6 xl:gap-8">
+                {plans.map((plan) => (
+                  <div key={plan.id} className="flex justify-center">
+                    <div className="w-full max-w-sm">
+                      <PricingCard
+                        name={plan.name}
+                        price={formatPrice(plan)}
+                        originalPrice={formatOriginalPrice(plan)}
+                        period={getPeriod()}
+                        description={plan.description}
+                        features={plan.features}
+                        popular={plan.is_popular}
+                        comingSoon={plan.is_coming_soon}
+                        discount={plan.discount_text}
+                        badge={plan.badge_text}
+                        color={plan.color_scheme}
+                        onGetStarted={() => handleSelectPlan(plan.id)}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
 
         {/* Trust Indicators */}
@@ -291,26 +290,26 @@ const PlanSelectionPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 max-w-2xl mx-auto">
             <div className="flex items-center justify-center gap-3">
               <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+              <span className="text-gray-600 text-sm lg:text-base">14 días gratis</span>
+            </div>
+            <div className="flex items-center justify-center gap-3">
+              <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
               <span className="text-gray-600 text-sm lg:text-base">Sin compromisos</span>
             </div>
             <div className="flex items-center justify-center gap-3">
               <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-              <span className="text-gray-600 text-sm lg:text-base">Datos seguros</span>
-            </div>
-            <div className="flex items-center justify-center gap-3">
-              <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-              <span className="text-gray-600 text-sm lg:text-base">Soporte personalizado</span>
+              <span className="text-gray-600 text-sm lg:text-base">Soporte incluido</span>
             </div>
           </div>
         </div>
 
         {/* Loading overlay */}
-        {isLoading && (
+        {isSubmitting && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl p-6 lg:p-8 shadow-2xl mx-4">
               <div className="flex items-center justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500 mr-3"></div>
-                <span className="text-base lg:text-lg font-medium text-gray-700">Configurando tu plan...</span>
+                <span className="text-base lg:text-lg font-medium text-gray-700">Procesando selección...</span>
               </div>
             </div>
           </div>

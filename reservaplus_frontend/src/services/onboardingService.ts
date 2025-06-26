@@ -1,6 +1,8 @@
-// src/services/onboardingService.ts 
+// src/services/onboardingService.ts - VERSIÓN CORREGIDA Y ALINEADA
+
 import { api } from './api'
 
+// Interfaces que coinciden con el backend
 export interface OnboardingCompleteData {
   registration_token: string
   organization: {
@@ -65,59 +67,93 @@ export interface OnboardingCompleteResponse {
   }
 }
 
-// Mantener las interfaces existentes para compatibilidad
-export interface OrganizationCreateData {
-  name: string
-  industry_template: string
+// Interfaz para el signup inicial
+export interface SignupData {
   email: string
-  phone: string
-  website?: string
-  address?: string
-  city?: string
-  country: string
-  settings?: Record<string, unknown>
+  plan_id: string
+  user_data: {
+    first_name: string
+    last_name: string
+    organization_name?: string
+  }
 }
 
-export interface ProfessionalCreateData {
-  name: string
-  email: string
-  phone?: string
-  specialty?: string
-  license_number?: string
-  bio?: string
-  color_code: string
-  is_active: boolean
-  accepts_walk_ins: boolean
-}
-
-export interface ServiceCreateData {
-  name: string
-  description?: string
-  category?: string
-  duration_minutes: number
-  price: number
-  buffer_time_before?: number
-  buffer_time_after?: number
-  is_active: boolean
-  requires_preparation: boolean
-  professionals?: string[]
+export interface SignupResponse {
+  message: string
+  registration_token: string
+  expires_at: string
+  selected_plan: {
+    id: string
+    name: string
+    price_monthly: number
+  }
+  next_step: string
 }
 
 export class OnboardingService {
+  
   /**
-   * Completar el proceso de onboarding usando el endpoint correcto del backend
+   * PASO 1: Iniciar el proceso de signup con plan seleccionado
+   */
+  static async startSignup(planId: string, userData: {
+    email: string
+    first_name: string
+    last_name: string
+    organization_name: string
+  }): Promise<SignupResponse> {
+    try {
+      const signupData = {
+        email: userData.email,
+        plan_id: planId,
+        user_data: {
+          first_name: userData.first_name,
+          last_name: userData.last_name,
+          organization_name: userData.organization_name
+        }
+      }
+
+      console.log('🚀 Iniciando signup:', signupData)
+      const response = await api.post('/api/signup/', signupData)
+      
+      console.log('✅ Signup exitoso:', response.data)
+      
+      // Guardar token temporal en localStorage
+      localStorage.setItem('registration_token', response.data.registration_token)
+      localStorage.setItem('signup_data', JSON.stringify(response.data))
+      
+      return response.data
+    } catch (error: unknown) {
+      console.error('❌ Error en signup:', error)
+      if (typeof error === 'object' && error !== null && 'response' in error) {
+        const errObj = error as { response?: { data?: { error?: string } } }
+        if (errObj.response?.data?.error) {
+          throw new Error(errObj.response.data.error)
+        }
+      }
+      throw new Error('Error al iniciar el registro')
+    }
+  }
+
+  /**
+   * PASO 2: Completar todo el onboarding de una vez
    */
   static async completeOnboarding(data: OnboardingCompleteData): Promise<OnboardingCompleteResponse> {
     try {
-      console.log('Enviando datos de onboarding completo:', data)
+      console.log('🔄 Completando onboarding:', data)
       
-      // Usar el endpoint correcto del backend
       const response = await api.post('/api/onboarding/complete/', data)
       
-      console.log('Respuesta del onboarding:', response.data)
+      console.log('✅ Onboarding completado:', response.data)
+      
+      // Limpiar datos temporales
+      localStorage.removeItem('registration_token')
+      localStorage.removeItem('signup_data')
+      localStorage.removeItem('onboarding_progress')
+      localStorage.removeItem('plan_selection')
+      
       return response.data
     } catch (error: unknown) {
-      console.error('Error completing onboarding:', error)
+      console.error('❌ Error completando onboarding:', error)
       
       if (typeof error === 'object' && error !== null && 'response' in error) {
         const errObj = error as { 
@@ -144,6 +180,23 @@ export class OnboardingService {
   }
 
   /**
+   * Verificar estado del token de registro
+   */
+  static async checkRegistrationStatus(token: string): Promise<{
+    is_valid: boolean
+    selected_plan?: any
+    expires_at?: string
+  }> {
+    try {
+      const response = await api.get(`/api/registration/${token}/`)
+      return response.data
+    } catch (error) {
+      console.error('Error verificando token:', error)
+      return { is_valid: false }
+    }
+  }
+
+  /**
    * Verificar si el usuario necesita onboarding
    */
   static async checkOnboardingStatus(): Promise<{
@@ -154,20 +207,8 @@ export class OnboardingService {
       // Verificar si ya tiene organización configurada
       const orgResponse = await api.get('/api/organizations/me/')
       
-      if (orgResponse.status === 200) {
-        // Verificar si tiene profesionales y servicios
-        const [profResponse, servResponse] = await Promise.all([
-          api.get('/api/organizations/professionals/'),
-          api.get('/api/organizations/services/')
-        ])
-        
-        const hasProfessionals = profResponse.data.results?.length > 0
-        const hasServices = servResponse.data.results?.length > 0
-        
-        return {
-          needsOnboarding: !(hasProfessionals && hasServices),
-          organizationData: orgResponse.data
-        }
+      if (orgResponse.status === 200 && orgResponse.data.onboarding_completed) {
+        return { needsOnboarding: false, organizationData: orgResponse.data }
       }
     } catch (error) {
       console.log('Usuario necesita onboarding:', error)
@@ -176,42 +217,34 @@ export class OnboardingService {
     return { needsOnboarding: true }
   }
 
-  // Mantener métodos existentes para compatibilidad
-  static getIndustryTemplate(industryType: string) {
-    const templates: Record<string, unknown> = {
-      salon: {
-        business_rules: {
-          allow_walk_ins: true,
-          cancellation_window_hours: 2,
-          requires_confirmation: false,
-          advance_booking_days: 30,
-          buffer_between_appointments: 15
-        }
-      },
-      clinic: {
-        business_rules: {
-          allow_walk_ins: false,
-          cancellation_window_hours: 24,
-          requires_confirmation: true,
-          advance_booking_days: 60,
-          buffer_between_appointments: 10
-        }
-      },
-      spa: {
-        business_rules: {
-          allow_walk_ins: false,
-          cancellation_window_hours: 24,
-          requires_confirmation: true,
-          advance_booking_days: 45,
-          buffer_between_appointments: 30
-        }
-      }
+  /**
+   * Obtener planes disponibles
+   */
+  static async getAvailablePlans() {
+    try {
+      const response = await api.get('/api/plans/')
+      return response.data
+    } catch (error) {
+      console.error('Error obteniendo planes:', error)
+      throw new Error('Error al cargar los planes')
     }
-    return templates[industryType] || templates.salon
   }
 
-  static getSuggestedServices(industryType: string): Partial<ServiceCreateData>[] {
-    const serviceTemplates: Record<string, Partial<ServiceCreateData>[]> = {
+  /**
+   * Obtener servicios sugeridos por industria
+   */
+  static getSuggestedServices(industryType: string) {
+    const serviceTemplates: Record<string, Array<{
+      name: string
+      description: string
+      category: string
+      duration_minutes: number
+      price: number
+      buffer_time_before?: number
+      buffer_time_after?: number
+      is_active: boolean
+      requires_preparation: boolean
+    }>> = {
       salon: [
         {
           name: 'Corte de Cabello',
@@ -266,60 +299,81 @@ export class OnboardingService {
           is_active: true,
           requires_preparation: false
         }
-      ],
-      spa: [
-        {
-          name: 'Masaje Relajante',
-          description: 'Masaje corporal completo',
-          category: 'Masajes',
-          duration_minutes: 60,
-          price: 30000,
-          buffer_time_before: 10,
-          buffer_time_after: 15,
-          is_active: true,
-          requires_preparation: true
-        },
-        {
-          name: 'Facial Hidratante',
-          description: 'Tratamiento facial hidratante',
-          category: 'Faciales',
-          duration_minutes: 45,
-          price: 25000,
-          buffer_time_before: 5,
-          buffer_time_after: 10,
-          is_active: true,
-          requires_preparation: true
-        }
       ]
     }
+    
     return serviceTemplates[industryType] || serviceTemplates.salon
   }
 
+  /**
+   * Validar datos del onboarding antes de enviar
+   */
   static validateOnboardingData(data: {
-    organization: OrganizationCreateData
-    professionals: ProfessionalCreateData[]
-    services: ServiceCreateData[]
+    organization: any
+    professionals: any[]
+    services: any[]
   }): { isValid: boolean; errors: string[] } {
     const errors: string[] = []
 
-    if (!data.organization.name?.trim()) {
+    // Validar organización
+    if (!data.organization?.name?.trim()) {
       errors.push('El nombre de la organización es requerido')
     }
-    if (!data.organization.email?.trim()) {
+    if (!data.organization?.email?.trim()) {
       errors.push('El email de la organización es requerido')
     }
-    if (!data.organization.phone?.trim()) {
+    if (!data.organization?.phone?.trim()) {
       errors.push('El teléfono de la organización es requerido')
     }
 
+    // Validar profesionales
     if (data.professionals.length === 0) {
       errors.push('Debe agregar al menos un profesional')
     }
+    
+    data.professionals.forEach((prof, index) => {
+      if (!prof.name?.trim()) {
+        errors.push(`Nombre del profesional ${index + 1} es requerido`)
+      }
+      if (!prof.email?.trim()) {
+        errors.push(`Email del profesional ${index + 1} es requerido`)
+      }
+    })
 
+    // Validar servicios
     if (data.services.length === 0) {
       errors.push('Debe agregar al menos un servicio')
     }
+    
+    data.services.forEach((serv, index) => {
+      if (!serv.name?.trim()) {
+        errors.push(`Nombre del servicio ${index + 1} es requerido`)
+      }
+      if (!serv.price || serv.price <= 0) {
+        errors.push(`Precio del servicio ${index + 1} debe ser mayor a 0`)
+      }
+      if (!serv.duration_minutes || serv.duration_minutes <= 0) {
+        errors.push(`Duración del servicio ${index + 1} debe ser mayor a 0`)
+      }
+    })
 
     return { isValid: errors.length === 0, errors }
+  }
+
+  /**
+   * Obtener información del token almacenado
+   */
+  static getStoredToken(): string | null {
+    return localStorage.getItem('registration_token')
+  }
+
+  /**
+   * Limpiar datos temporales del onboarding
+   */
+  static clearOnboardingData(): void {
+    localStorage.removeItem('registration_token')
+    localStorage.removeItem('signup_data')
+    localStorage.removeItem('onboarding_progress')
+    localStorage.removeItem('plan_selection')
   }
 }

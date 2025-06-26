@@ -1,74 +1,68 @@
-// src/pages/onboarding/TeamSetupPage.tsx
+// src/pages/onboarding/TeamSetupPage.tsx - VERSIÓN ACTUALIZADA Y ALINEADA
+
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Plus, Trash2, User, Mail, Phone, Users, AlertCircle } from 'lucide-react'
-
-interface Professional {
-  id: string
-  name: string
-  email: string
-  phone: string
-  specialty: string
-  license_number: string
-  bio: string
-  color_code: string
-  is_active: boolean
-  accepts_walk_ins: boolean
-}
-
-interface TeamSetupData {
-  professionals: Professional[]
-}
+import { useOnboarding } from '../../contexts/OnboardingContext'
 
 const TeamSetupPage: React.FC = () => {
   const navigate = useNavigate()
+  const { 
+    professionals, 
+    addProfessional, 
+    updateProfessional, 
+    removeProfessional,
+    organizationData,
+    updateOrganizationData,
+    canProceedFromStep,
+    nextStep,
+    registrationToken
+  } = useOnboarding()
+  
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<{[key: string]: string[]}>({})
   const [selectedIndustry, setSelectedIndustry] = useState<string>('')
-  const [teamData, setTeamData] = useState<TeamSetupData>({
-    professionals: [
-      {
-        id: 'admin',
-        name: '',
-        email: '',
-        phone: '',
-        specialty: '',
-        license_number: '',
-        bio: '',
-        color_code: '#10B981',
-        is_active: true,
-        accepts_walk_ins: false
-      }
-    ]
-  })
 
-  // Colores predefinidos para profesionales
-  const availableColors = [
-    '#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444',
-    '#06B6D4', '#84CC16', '#F97316', '#EC4899', '#6366F1'
-  ]
-
+  // Cargar datos del formulario de registro
   useEffect(() => {
-    const registrationData = localStorage.getItem('registrationData')
-    if (registrationData) {
-      const data = JSON.parse(registrationData)
-      setSelectedIndustry(data.industryTemplate)
-      
-      // Pre-llenar con datos del administrador
-      setTeamData(prev => ({
-        ...prev,
-        professionals: [{
-          ...prev.professionals[0],
-          name: `${data.firstName} ${data.lastName}`,
-          email: data.email,
-          phone: data.phone,
-          specialty: getDefaultSpecialty(data.industryTemplate, 'admin')
-        }]
-      }))
-    } else {
-      navigate('/onboarding/register')
+    if (!registrationToken) {
+      navigate('/onboarding/plan')
+      return
     }
-  }, [navigate])
+
+    const registrationFormData = localStorage.getItem('registration_form_data')
+    if (registrationFormData) {
+      try {
+        const data = JSON.parse(registrationFormData)
+        setSelectedIndustry(data.industryTemplate)
+        
+        // Actualizar datos de organización en el contexto
+        updateOrganizationData({
+          name: data.formData.organizationName,
+          industry_template: data.industryTemplate,
+          email: data.businessInfo.email,
+          phone: data.businessInfo.phone,
+          address: data.businessInfo.address,
+          city: data.businessInfo.city,
+          country: data.businessInfo.country
+        })
+
+        // Si no hay profesionales, agregar uno inicial con datos del admin
+        if (professionals.length === 0) {
+          addProfessional()
+          updateProfessional(0, {
+            name: `${data.formData.firstName} ${data.formData.lastName}`,
+            email: data.formData.email,
+            phone: data.formData.phone,
+            specialty: getDefaultSpecialty(data.industryTemplate, 'admin'),
+            accepts_walk_ins: false
+          })
+        }
+      } catch (error) {
+        console.error('Error parsing registration data:', error)
+      }
+    }
+  }, [registrationToken, navigate, updateOrganizationData, professionals.length, addProfessional, updateProfessional])
 
   const getDefaultSpecialty = (industry: string, role: 'admin' | 'professional'): string => {
     const specialties: {[key: string]: {admin: string, professional: string}} = {
@@ -98,51 +92,38 @@ const TeamSetupPage: React.FC = () => {
     return terms[industry] || { professional: 'Profesional', professionals: 'Profesionales' }
   }
 
-  const addProfessional = () => {
-    const usedColors = teamData.professionals.map(p => p.color_code)
-    const availableColor = availableColors.find(color => !usedColors.includes(color)) || availableColors[0]
-
-    const newProfessional: Professional = {
-      id: `prof-${Date.now()}`,
-      name: '',
-      email: '',
-      phone: '',
-      specialty: getDefaultSpecialty(selectedIndustry, 'professional'),
-      license_number: '',
-      bio: '',
-      color_code: availableColor,
-      is_active: true,
-      accepts_walk_ins: true
+  const handleAddProfessional = () => {
+    if (professionals.length >= 3) {
+      alert('El Plan Básico permite máximo 3 profesionales + administrador')
+      return
     }
-
-    setTeamData(prev => ({
-      ...prev,
-      professionals: [...prev.professionals, newProfessional]
-    }))
+    
+    addProfessional()
+    // Actualizar con especialidad por defecto
+    setTimeout(() => {
+      updateProfessional(professionals.length, {
+        specialty: getDefaultSpecialty(selectedIndustry, 'professional')
+      })
+    }, 100)
   }
 
-  const removeProfessional = (id: string) => {
-    if (id === 'admin') return // No se puede eliminar al admin
-
-    setTeamData(prev => ({
-      ...prev,
-      professionals: prev.professionals.filter(p => p.id !== id)
-    }))
+  const handleRemoveProfessional = (index: number) => {
+    if (index === 0) {
+      alert('No puedes eliminar al administrador principal')
+      return
+    }
+    
+    removeProfessional(index)
   }
 
-  const updateProfessional = (id: string, field: keyof Professional, value: string | boolean) => {
-    setTeamData(prev => ({
-      ...prev,
-      professionals: prev.professionals.map(p =>
-        p.id === id ? { ...p, [field]: value } : p
-      )
-    }))
+  const handleUpdateProfessional = (index: number, field: string, value: string | boolean) => {
+    updateProfessional(index, { [field]: value })
 
     // Limpiar errores cuando el usuario empiece a escribir
-    if (errors[`${id}.${field}`]) {
+    if (errors[`${index}.${field}`]) {
       setErrors(prev => {
         const newErrors = { ...prev }
-        delete newErrors[`${id}.${field}`]
+        delete newErrors[`${index}.${field}`]
         return newErrors
       })
     }
@@ -151,23 +132,23 @@ const TeamSetupPage: React.FC = () => {
   const validateForm = (): boolean => {
     const newErrors: {[key: string]: string[]} = {}
 
-    teamData.professionals.forEach((professional) => {
+    professionals.forEach((professional, index) => {
       if (!professional.name.trim()) {
-        newErrors[`${professional.id}.name`] = ['El nombre es requerido']
+        newErrors[`${index}.name`] = ['El nombre es requerido']
       }
       if (!professional.email.trim()) {
-        newErrors[`${professional.id}.email`] = ['El email es requerido']
+        newErrors[`${index}.email`] = ['El email es requerido']
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(professional.email)) {
-        newErrors[`${professional.id}.email`] = ['Email inválido']
+        newErrors[`${index}.email`] = ['Email inválido']
       }
       if (!professional.phone.trim()) {
-        newErrors[`${professional.id}.phone`] = ['El teléfono es requerido']
+        newErrors[`${index}.phone`] = ['El teléfono es requerido']
       }
 
       // Verificar emails duplicados
-      const emailCount = teamData.professionals.filter(p => p.email === professional.email).length
+      const emailCount = professionals.filter(p => p.email === professional.email).length
       if (emailCount > 1 && professional.email.trim()) {
-        newErrors[`${professional.id}.email`] = ['Este email ya está en uso']
+        newErrors[`${index}.email`] = ['Este email ya está en uso']
       }
     })
 
@@ -180,14 +161,8 @@ const TeamSetupPage: React.FC = () => {
 
     setIsLoading(true)
     try {
-      // Guardar datos del equipo para el siguiente paso
-      const existingData = JSON.parse(localStorage.getItem('onboardingData') || '{}')
-      localStorage.setItem('onboardingData', JSON.stringify({
-        ...existingData,
-        teamData: teamData
-      }))
-
-      navigate('/onboarding/organization')
+      // Usar el método del contexto para avanzar
+      nextStep()
     } catch (error) {
       console.error('Error al guardar equipo:', error)
     } finally {
@@ -200,6 +175,7 @@ const TeamSetupPage: React.FC = () => {
   }
 
   const industryTerms = getIndustryTerms(selectedIndustry)
+  const canProceed = canProceedFromStep(2) // Step 2 es Team
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-blue-50">
@@ -244,7 +220,7 @@ const TeamSetupPage: React.FC = () => {
             </span>
           </h2>
           <p className="text-xl text-gray-600">
-            Agrega a los {industryTerms.professionals.toLowerCase()} que trabajarán en tu negocio
+            Agrega a los {industryTerms.professionals.toLowerCase()} que trabajarán en {organizationData.name || 'tu negocio'}
           </p>
         </div>
 
@@ -253,8 +229,8 @@ const TeamSetupPage: React.FC = () => {
           <div className="space-y-8">
             
             {/* Current Team Members */}
-            {teamData.professionals.map((professional, index) => (
-              <div key={professional.id} className="relative">
+            {professionals.map((professional, index) => (
+              <div key={index} className="relative">
                 <div className="bg-gray-50 rounded-2xl p-6 border-2 border-dashed border-gray-200">
                   
                   {/* Header del profesional */}
@@ -268,10 +244,10 @@ const TeamSetupPage: React.FC = () => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {professional.id === 'admin' ? 'Administrador Principal' : `${industryTerms.professional} ${index}`}
+                          {index === 0 ? 'Administrador Principal' : `${industryTerms.professional} ${index}`}
                         </h3>
                         <p className="text-sm text-gray-500">
-                          {professional.id === 'admin' ? 'Acceso completo al sistema' : 'Gestión de citas y clientes'}
+                          {index === 0 ? 'Acceso completo al sistema' : 'Gestión de citas y clientes'}
                         </p>
                       </div>
                     </div>
@@ -279,11 +255,11 @@ const TeamSetupPage: React.FC = () => {
                     <div className="flex items-center space-x-3">
                       {/* Color picker */}
                       <div className="flex space-x-1">
-                        {availableColors.slice(0, 5).map(color => (
+                        {['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336'].map(color => (
                           <button
                             key={color}
                             type="button"
-                            onClick={() => updateProfessional(professional.id, 'color_code', color)}
+                            onClick={() => handleUpdateProfessional(index, 'color_code', color)}
                             className={`w-6 h-6 rounded-full border-2 transition-all ${
                               professional.color_code === color ? 'border-gray-400 scale-110' : 'border-gray-200'
                             }`}
@@ -293,10 +269,10 @@ const TeamSetupPage: React.FC = () => {
                       </div>
                       
                       {/* Eliminar (solo para no-admin) */}
-                      {professional.id !== 'admin' && (
+                      {index !== 0 && (
                         <button
                           type="button"
-                          onClick={() => removeProfessional(professional.id)}
+                          onClick={() => handleRemoveProfessional(index)}
                           className="w-8 h-8 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -316,18 +292,18 @@ const TeamSetupPage: React.FC = () => {
                         <input
                           type="text"
                           value={professional.name}
-                          onChange={(e) => updateProfessional(professional.id, 'name', e.target.value)}
+                          onChange={(e) => handleUpdateProfessional(index, 'name', e.target.value)}
                           className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                            errors[`${professional.id}.name`] ? 'border-red-300' : 'border-gray-300'
+                            errors[`${index}.name`] ? 'border-red-300' : 'border-gray-300'
                           }`}
                           placeholder="Juan Pérez"
-                          disabled={professional.id === 'admin'}
+                          disabled={index === 0}
                         />
                       </div>
-                      {errors[`${professional.id}.name`] && (
+                      {errors[`${index}.name`] && (
                         <p className="mt-1 text-sm text-red-600 flex items-center">
                           <AlertCircle className="w-4 h-4 mr-1" />
-                          {errors[`${professional.id}.name`][0]}
+                          {errors[`${index}.name`][0]}
                         </p>
                       )}
                     </div>
@@ -341,18 +317,18 @@ const TeamSetupPage: React.FC = () => {
                         <input
                           type="email"
                           value={professional.email}
-                          onChange={(e) => updateProfessional(professional.id, 'email', e.target.value)}
+                          onChange={(e) => handleUpdateProfessional(index, 'email', e.target.value)}
                           className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                            errors[`${professional.id}.email`] ? 'border-red-300' : 'border-gray-300'
+                            errors[`${index}.email`] ? 'border-red-300' : 'border-gray-300'
                           }`}
                           placeholder="juan@ejemplo.com"
-                          disabled={professional.id === 'admin'}
+                          disabled={index === 0}
                         />
                       </div>
-                      {errors[`${professional.id}.email`] && (
+                      {errors[`${index}.email`] && (
                         <p className="mt-1 text-sm text-red-600 flex items-center">
                           <AlertCircle className="w-4 h-4 mr-1" />
-                          {errors[`${professional.id}.email`][0]}
+                          {errors[`${index}.email`][0]}
                         </p>
                       )}
                     </div>
@@ -366,17 +342,17 @@ const TeamSetupPage: React.FC = () => {
                         <input
                           type="tel"
                           value={professional.phone}
-                          onChange={(e) => updateProfessional(professional.id, 'phone', e.target.value)}
+                          onChange={(e) => handleUpdateProfessional(index, 'phone', e.target.value)}
                           className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                            errors[`${professional.id}.phone`] ? 'border-red-300' : 'border-gray-300'
+                            errors[`${index}.phone`] ? 'border-red-300' : 'border-gray-300'
                           }`}
                           placeholder="+56 9 1234 5678"
                         />
                       </div>
-                      {errors[`${professional.id}.phone`] && (
+                      {errors[`${index}.phone`] && (
                         <p className="mt-1 text-sm text-red-600 flex items-center">
                           <AlertCircle className="w-4 h-4 mr-1" />
-                          {errors[`${professional.id}.phone`][0]}
+                          {errors[`${index}.phone`][0]}
                         </p>
                       )}
                     </div>
@@ -388,67 +364,39 @@ const TeamSetupPage: React.FC = () => {
                       <input
                         type="text"
                         value={professional.specialty}
-                        onChange={(e) => updateProfessional(professional.id, 'specialty', e.target.value)}
+                        onChange={(e) => handleUpdateProfessional(index, 'specialty', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        placeholder={`Ej: ${getDefaultSpecialty(selectedIndustry, 'professional')}`}
+                        placeholder={`Ej: ${getDefaultSpecialty(selectedIndustry, index === 0 ? 'admin' : 'professional')}`}
                       />
                     </div>
 
-                    {(selectedIndustry === 'clinic' || selectedIndustry === 'dental') && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Número de Licencia
-                        </label>
-                        <input
-                          type="text"
-                          value={professional.license_number}
-                          onChange={(e) => updateProfessional(professional.id, 'license_number', e.target.value)}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                          placeholder="Ej: 12345"
-                        />
+                    {/* Configuraciones adicionales para no-admin */}
+                    {index !== 0 && (
+                      <div className="md:col-span-2">
+                        <div className="flex items-center justify-between p-4 bg-white rounded-xl border">
+                          <div>
+                            <h4 className="font-medium text-gray-900">Acepta citas sin reserva</h4>
+                            <p className="text-sm text-gray-500">Puede atender clientes que lleguen sin cita previa</p>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={professional.accepts_walk_ins}
+                            onChange={(e) => handleUpdateProfessional(index, 'accepts_walk_ins', e.target.checked)}
+                            className="w-6 h-6 text-emerald-600 rounded"
+                          />
+                        </div>
                       </div>
                     )}
-
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Biografía (Opcional)
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={professional.bio}
-                        onChange={(e) => updateProfessional(professional.id, 'bio', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        placeholder="Experiencia, certificaciones, intereses..."
-                      />
-                    </div>
                   </div>
-
-                  {/* Configuraciones adicionales para no-admin */}
-                  {professional.id !== 'admin' && (
-                    <div className="mt-6 pt-6 border-t border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium text-gray-900">Acepta citas sin reserva</h4>
-                          <p className="text-sm text-gray-500">Puede atender clientes que lleguen sin cita previa</p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={professional.accepts_walk_ins}
-                          onChange={(e) => updateProfessional(professional.id, 'accepts_walk_ins', e.target.checked)}
-                          className="w-6 h-6 text-emerald-600 rounded"
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             ))}
 
             {/* Add Professional Button */}
-            {teamData.professionals.length < 4 && (
+            {professionals.length < 4 && (
               <button
                 type="button"
-                onClick={addProfessional}
+                onClick={handleAddProfessional}
                 className="w-full py-6 border-2 border-dashed border-gray-300 rounded-2xl text-gray-600 hover:border-emerald-500 hover:text-emerald-600 transition-all duration-200 flex items-center justify-center space-x-3"
               >
                 <Plus className="w-6 h-6" />
@@ -457,7 +405,7 @@ const TeamSetupPage: React.FC = () => {
             )}
 
             {/* Límite alcanzado */}
-            {teamData.professionals.length >= 4 && (
+            {professionals.length >= 4 && (
               <div className="text-center py-4">
                 <p className="text-gray-500">
                   Has alcanzado el límite de {industryTerms.professionals.toLowerCase()} para el Plan Básico (3 + administrador)
@@ -482,7 +430,7 @@ const TeamSetupPage: React.FC = () => {
 
           <button
             onClick={handleSubmit}
-            disabled={isLoading}
+            disabled={isLoading || !canProceed}
             className="flex items-center px-8 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             {isLoading ? (
@@ -492,7 +440,7 @@ const TeamSetupPage: React.FC = () => {
               </>
             ) : (
               <>
-                Continuar a Configuración
+                Continuar a Servicios
                 <ArrowRight className="w-5 h-5 ml-2" />
               </>
             )}
@@ -514,9 +462,26 @@ const TeamSetupPage: React.FC = () => {
                 <li>• Cada {industryTerms.professional.toLowerCase()} puede gestionar su calendario</li>
                 <li>• Invitaciones por email automáticas</li>
               </ul>
+              <div className="mt-3 text-sm">
+                <span className="font-medium text-blue-900">Progreso actual:</span>
+                <span className="ml-2 text-blue-700">{professionals.length}/4 miembros del equipo</span>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Validation Notice */}
+        {!canProceed && professionals.length > 0 && (
+          <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+            <div className="flex items-center">
+              <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
+              <div className="text-sm text-yellow-800">
+                <p className="font-medium">Completa la información requerida</p>
+                <p>Asegúrate de que todos los profesionales tengan nombre, email y teléfono válidos.</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

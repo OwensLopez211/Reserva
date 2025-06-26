@@ -1,7 +1,7 @@
-// src/components/ProtectedRoute.tsx - SIMPLIFICADO PARA EVITAR LOOPS
 import React from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useOnboarding } from '../contexts/OnboardingContext'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -9,10 +9,12 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth()
+  const { registrationToken } = useOnboarding()
   const location = useLocation()
 
-  console.log('ProtectedRoute:', { isAuthenticated, loading, path: location.pathname })
+  const isOnboardingRoute = location.pathname.startsWith('/onboarding')
 
+  // Mientras carga, muestra loader
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -21,14 +23,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     )
   }
 
-  if (!isAuthenticated) {
-    console.log('ProtectedRoute: Redirigiendo a login desde:', location.pathname)
-    // Guardar la ubicación actual para redirigir después del login
-    return <Navigate to="/login" state={{ from: location }} replace />
+  // Permitir si está autenticado
+  if (isAuthenticated) {
+    return <>{children}</>
   }
 
-  console.log('ProtectedRoute: Usuario autenticado, mostrando contenido protegido')
-  return <>{children}</>
+  // Permitir si está en onboarding y tiene token de registro
+  if (isOnboardingRoute && registrationToken) {
+    return <>{children}</>
+  }
+
+  // Si no, redirigir a login
+  return <Navigate to="/login" state={{ from: location }} replace />
 }
 
 export default ProtectedRoute
