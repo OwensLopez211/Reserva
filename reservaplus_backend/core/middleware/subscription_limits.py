@@ -1,9 +1,8 @@
-# core/middleware.py
+# core/middleware/subscription_limits.py
 
 from django.http import JsonResponse
 from django.utils.deprecation import MiddlewareMixin
 from plans.models import OrganizationSubscription
-import json
 
 
 class SubscriptionLimitsMiddleware(MiddlewareMixin):
@@ -119,64 +118,3 @@ class SubscriptionLimitsMiddleware(MiddlewareMixin):
                 }, status=403)
         
         return None
-
-
-class SubscriptionCounterMiddleware(MiddlewareMixin):
-    """
-    Middleware para actualizar contadores de suscripción automáticamente
-    """
-    
-    def process_response(self, request, response):
-        """
-        Actualizar contadores después de operaciones exitosas
-        """
-        # Solo procesar respuestas exitosas de creación/eliminación
-        if response.status_code not in [201, 204]:
-            return response
-        
-        # Solo procesar si el usuario está autenticado y tiene organización
-        if (not hasattr(request, 'user') or 
-            not request.user.is_authenticated or 
-            not hasattr(request.user, 'organization') or 
-            not request.user.organization):
-            return response
-        
-        try:
-            subscription = OrganizationSubscription.objects.get(
-                organization=request.user.organization
-            )
-            
-            path = request.path_info
-            
-            # Incrementar contadores en POST exitoso
-            if request.method == 'POST' and response.status_code == 201:
-                if '/professionals/' in path:
-                    subscription.increment_professionals_count()
-                elif '/services/' in path:
-                    subscription.increment_services_count()
-                elif '/clients/' in path:
-                    subscription.current_clients_count += 1
-                    subscription.save(update_fields=['current_clients_count'])
-                elif '/appointments/' in path:
-                    subscription.current_month_appointments_count += 1
-                    subscription.save(update_fields=['current_month_appointments_count'])
-            
-            # Decrementar contadores en DELETE exitoso
-            elif request.method == 'DELETE' and response.status_code == 204:
-                if '/professionals/' in path:
-                    subscription.decrement_professionals_count()
-                elif '/services/' in path:
-                    subscription.decrement_services_count()
-                elif '/clients/' in path:
-                    if subscription.current_clients_count > 0:
-                        subscription.current_clients_count -= 1
-                        subscription.save(update_fields=['current_clients_count'])
-                elif '/appointments/' in path:
-                    if subscription.current_month_appointments_count > 0:
-                        subscription.current_month_appointments_count -= 1
-                        subscription.save(update_fields=['current_month_appointments_count'])
-        
-        except OrganizationSubscription.DoesNotExist:
-            pass
-        
-        return response
