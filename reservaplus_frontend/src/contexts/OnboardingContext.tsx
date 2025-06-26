@@ -1,6 +1,6 @@
-// src/contexts/OnboardingContext.tsx
+// src/contexts/OnboardingContext.tsx - ARCHIVO COMPLETO CORREGIDO
 import React, { createContext, useContext, useState, ReactNode } from 'react'
-import { OnboardingService, OnboardingData, OrganizationCreateData, ProfessionalCreateData, ServiceCreateData } from '../services/onboardingService'
+import { OnboardingService, OrganizationCreateData, ProfessionalCreateData, ServiceCreateData } from '../services/onboardingService'
 
 interface OnboardingContextType {
   // Estado del onboarding
@@ -193,35 +193,57 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   }
 
   const validateCurrentData = () => {
-    const onboardingData: OnboardingData = {
+    const onboardingData = {
       organization: organizationData,
       professionals,
-      services,
-      settings: OnboardingService.getIndustryTemplate(organizationData.industry_template)
+      services
     }
     return OnboardingService.validateOnboardingData(onboardingData)
   }
 
-  // Finalización del onboarding
+  // Finalización del onboarding - FUNCIÓN CORREGIDA
   const completeOnboarding = async () => {
     setIsCompleting(true)
     try {
-      const onboardingData: OnboardingData = {
-        organization: {
-          ...organizationData,
-          settings: OnboardingService.getIndustryTemplate(organizationData.industry_template)
-        },
-        professionals,
-        services,
-        settings: OnboardingService.getIndustryTemplate(organizationData.industry_template)
+      // Obtener token del localStorage o context
+      const registrationToken = localStorage.getItem('registration_token')
+      if (!registrationToken) {
+        throw new Error('No se encontró token de registro')
       }
 
+      const onboardingData = {
+        registration_token: registrationToken,
+        organization: organizationData,
+        professionals: professionals.map(prof => ({
+          name: prof.name,
+          email: prof.email,
+          phone: prof.phone || '',
+          specialty: prof.specialty || '',
+          color_code: prof.color_code,
+          accepts_walk_ins: prof.accepts_walk_ins
+        })),
+        services: services.map(serv => ({
+          name: serv.name,
+          description: serv.description || '',
+          category: serv.category || '',
+          duration_minutes: serv.duration_minutes,
+          price: serv.price,
+          buffer_time_before: serv.buffer_time_before || 0,
+          buffer_time_after: serv.buffer_time_after || 10,
+          is_active: serv.is_active,
+          requires_preparation: serv.requires_preparation
+        }))
+      }
+
+      console.log('Completando onboarding con datos:', onboardingData)
       const result = await OnboardingService.completeOnboarding(onboardingData)
       
-      if (result.success) {
+      if (result.message) {
         markStepCompleted(currentStep)
-        // Redirigir al dashboard o mostrar éxito
-        window.location.href = '/dashboard'
+        // Limpiar token de registro
+        localStorage.removeItem('registration_token')
+        // Redirigir al welcome o dashboard
+        window.location.href = '/welcome'
       }
     } catch (error) {
       console.error('Error completing onboarding:', error)
@@ -313,36 +335,12 @@ export const useOnboardingStatus = () => {
 
   const checkOnboardingStatus = async () => {
     try {
-      // Verificar si la organización ya está configurada
-      const orgResponse = await fetch('/api/organizations/me/')
+      setLoading(true)
       
-      if (orgResponse.ok) {
-        const orgData = await orgResponse.json()
-        
-        // Verificar si tiene profesionales y servicios
-        const [profResponse, servResponse] = await Promise.all([
-          fetch('/api/organizations/professionals/'),
-          fetch('/api/organizations/services/')
-        ])
-        
-        if (profResponse.ok && servResponse.ok) {
-          const [professionals, services] = await Promise.all([
-            profResponse.json(),
-            servResponse.json()
-          ])
-          
-          // Si tiene organización, profesionales y servicios, no necesita onboarding
-          const hasCompleteSetup = orgData && 
-                                  professionals.results?.length > 0 && 
-                                  services.results?.length > 0
-          
-          setNeedsOnboarding(!hasCompleteSetup)
-        } else {
-          setNeedsOnboarding(true)
-        }
-      } else {
-        setNeedsOnboarding(true)
-      }
+      // Usar el servicio corregido
+      const status = await OnboardingService.checkOnboardingStatus()
+      setNeedsOnboarding(status.needsOnboarding)
+      
     } catch (error) {
       console.error('Error checking onboarding status:', error)
       setNeedsOnboarding(true)

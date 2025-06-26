@@ -1,6 +1,6 @@
 // src/components/pricing/PricingHeroSection.tsx
 import React from 'react'
-import { DollarSign, ArrowDown, Sparkles } from 'lucide-react'
+import { DollarSign, ArrowDown } from 'lucide-react'
 
 interface PricingHeroSectionProps {
   title?: string

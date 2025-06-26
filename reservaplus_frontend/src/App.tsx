@@ -1,4 +1,4 @@
-// src/App.tsx - LIMPIO SIN DOBLE TRANSICIÓN
+// src/App.tsx - VERSIÓN CORREGIDA
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { OnboardingProvider } from './contexts/OnboardingContext'
@@ -17,8 +17,12 @@ import { PricingPage } from './pages/public/PricingPage'
 import LoginLayout from './components/layouts/LoginLayout'
 
 // Páginas de onboarding
-import OnboardingPage from './pages/onboarding/OnboardingPage'
-import { OnboardingWelcome } from './components/onboarding/OnboardingWelcome'
+import PlanSelectionPage from './pages/onboarding/PlanSelectionPage'
+import RegistrationPage from './pages/onboarding/RegistrationPage'
+import TeamSetupPage from './pages/onboarding/TeamSetupPage'
+import OrganizationConfigPage from './pages/onboarding/OrganizationConfigPage'
+import PaymentSetupPage from './pages/onboarding/PaymentSetupPage'
+import OnboardingWelcomePage from './pages/onboarding/OnboardingWelcomePage'
 
 // Páginas privadas
 import DashboardPage from './pages/dashboard/DashboardPage'
@@ -248,25 +252,34 @@ function App() {
                 {/* Login fuera del layout público */}
                 <Route path="/login" element={<LoginLayout />} />
 
-                {/* Ruta de onboarding - requiere autenticación pero no onboarding completo */}
-                <Route 
-                  path="/onboarding" 
-                  element={
+                {/* RUTAS DE ONBOARDING - PÚBLICAS (sin autenticación requerida) */}
+                <Route path="/onboarding">
+                  <Route path="plan" element={<PlanSelectionPage />} />
+                  <Route path="register" element={<RegistrationPage />} />
+                  {/* Las siguientes requieren estar registrado */}
+                  <Route path="team" element={
                     <ProtectedRoute>
-                      <OnboardingPage />
+                      <TeamSetupPage />
                     </ProtectedRoute>
-                  } 
-                />
-
-                {/* Ruta de bienvenida - para usuarios recién registrados */}
-                <Route 
-                  path="/welcome" 
-                  element={
+                  } />
+                  <Route path="organization" element={
                     <ProtectedRoute>
-                      <OnboardingWelcome />
+                      <OrganizationConfigPage />
                     </ProtectedRoute>
-                  } 
-                />
+                  } />
+                  <Route path="payment" element={
+                    <ProtectedRoute>
+                      <PaymentSetupPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="welcome" element={
+                    <ProtectedRoute>
+                      <OnboardingWelcomePage />
+                    </ProtectedRoute>
+                  } />
+                  {/* Ruta por defecto del onboarding */}
+                  <Route index element={<Navigate to="/onboarding/plan" replace />} />
+                </Route>
 
                 {/* Rutas privadas - requieren autenticación Y onboarding completo */}
                 <Route
@@ -284,6 +297,8 @@ function App() {
                   <Route path="clientes" element={<ClientesPage />} />
                   <Route path="perfil" element={<PerfilPage />} />
                   <Route path="configuracion" element={<ConfiguracionPage />} />
+                  {/* Ruta por defecto de la app */}
+                  <Route index element={<Navigate to="/app/dashboard" replace />} />
                 </Route>
 
                 {/* Rutas de redirección */}

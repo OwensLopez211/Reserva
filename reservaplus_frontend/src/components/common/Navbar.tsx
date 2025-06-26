@@ -1,6 +1,6 @@
 // src/components/common/Navbar.tsx - CON TRANSICIONES INTEGRADAS
 import React, { useState, useEffect, useCallback } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Calendar, Shield, Users, Phone, ArrowUp } from 'lucide-react'
 import { useTransition } from '../../contexts/TransitionContext'
 
@@ -207,7 +207,7 @@ const Navbar: React.FC = () => {
                 Iniciar Sesión
               </button>
               <button
-                onClick={(e) => handleNavigation('/login', e)}
+                onClick={(e) => handleNavigation('/onboarding/plan', e)}
                 disabled={isTransitioning}
                 className={`relative group bg-gradient-to-r from-emerald-500 to-cyan-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:from-emerald-600 hover:to-cyan-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 overflow-hidden ${
                   isTransitioning ? 'opacity-50 cursor-not-allowed' : ''
@@ -313,7 +313,7 @@ const Navbar: React.FC = () => {
                   Iniciar Sesión
                 </button>
                 <button
-                  onClick={(e) => handleNavigation('/login', e)}
+                  onClick={(e) => handleNavigation('/onboarding/plan', e)}
                   disabled={isTransitioning}
                   className={`flex items-center justify-center w-full bg-gradient-to-r from-emerald-500 to-cyan-500 text-white px-4 py-3 rounded-xl text-base font-semibold hover:from-emerald-600 hover:to-cyan-600 transition-all duration-300 text-center shadow-lg transform hover:scale-105 ${
                     isTransitioning ? 'opacity-50 cursor-not-allowed' : ''
