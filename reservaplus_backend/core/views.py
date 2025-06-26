@@ -1,19 +1,37 @@
-# core/views.py - NUEVA VISTA PARA ONBOARDING COMPLETO
+# core/views.py - VISTA ACTUALIZADA PARA ONBOARDING COMPLETO
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny
+from rest_framework import status
 from django.db import transaction
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+from datetime import timedelta
+
 from organizations.models import Organization, Professional, Service
-from organizations.serializers import OnboardingSetupSerializer
+from plans.models import UserRegistration, OrganizationSubscription
+from plans.serializers import OnboardingDataSerializer
+
+User = get_user_model()
 
 class OnboardingCompleteView(APIView):
     """
     Vista para completar todo el proceso de onboarding en una sola llamada
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # Usa token temporal, no requiere autenticación
     
     def post(self, request):
-        serializer = OnboardingSetupSerializer(data=request.data)
+        """
+        Completar onboarding con todos los datos
+        Payload esperado:
+        {
+            "registration_token": "token-temporal",
+            "organization": {...},
+            "professionals": [...],
+            "services": [...]
+        }
+        """
+        serializer = OnboardingDataSerializer(data=request.data)
         
         if not serializer.is_valid():
             return Response({
@@ -23,33 +41,48 @@ class OnboardingCompleteView(APIView):
         
         try:
             with transaction.atomic():
-                # 1. Actualizar organización
-                user = request.user
-                organization = user.organization
+                # Obtener registro temporal validado
+                registration = serializer.context['registration']
                 
-                if not organization:
-                    return Response({
-                        'error': 'Usuario no tiene organización asignada'
-                    }, status=status.HTTP_400_BAD_REQUEST)
+                # 1. Crear usuario principal (owner de la organización)
+                user_data = registration.registration_data
+                user = User.objects.create_user(
+                    username=user_data.get('email', registration.email),
+                    email=registration.email,
+                    first_name=user_data.get('first_name', ''),
+                    last_name=user_data.get('last_name', ''),
+                    role='owner'
+                )
                 
+                # 2. Crear organización
                 org_data = serializer.validated_data['organization']
-                for field, value in org_data.items():
-                    if hasattr(organization, field):
-                        setattr(organization, field, value)
+                organization = Organization.objects.create(
+                    name=org_data['name'],
+                    industry_template=org_data['industry_template'],
+                    email=org_data['email'],
+                    phone=org_data['phone'],
+                    address=org_data.get('address', ''),
+                    city=org_data.get('city', ''),
+                    country=org_data.get('country', 'Chile'),
+                    settings=self._get_industry_settings(org_data['industry_template'])
+                )
                 
-                # Aplicar configuraciones de industria
-                from core.industry_templates import INDUSTRY_TEMPLATES
-                template = INDUSTRY_TEMPLATES.get(org_data.get('industry_template', 'salon'))
-                if template:
-                    organization.settings = {
-                        **template.get('business_rules', {}),
-                        **template.get('business_hours', {}),
-                        **(organization.settings or {})
-                    }
+                # Asignar usuario a organización
+                user.organization = organization
+                user.save()
                 
-                organization.save()
+                # 3. Crear suscripción
+                subscription = OrganizationSubscription.objects.create(
+                    organization=organization,
+                    plan=registration.selected_plan,
+                    status='trial',
+                    trial_start=timezone.now(),
+                    trial_end=timezone.now() + timedelta(days=14),
+                    current_period_start=timezone.now(),
+                    current_period_end=timezone.now() + timedelta(days=14),
+                )
                 
-                # 2. Crear profesionales
+                # 4. Crear profesionales
                 professionals_data = serializer.validated_data['professionals']
                 created_professionals = []
                 
@@ -65,8 +98,9 @@ class OnboardingCompleteView(APIView):
                         accepts_walk_ins=prof_data.get('accepts_walk_ins', True)
                     )
                     created_professionals.append(professional)
+                    subscription.increment_professionals_count()
                 
-                # 3. Crear servicios
+                # 5. Crear servicios
                 services_data = serializer.validated_data['services']
                 created_services = []
                 
@@ -87,6 +121,11 @@ class OnboardingCompleteView(APIView):
                     # Asignar todos los profesionales al servicio
                     service.professionals.set(created_professionals)
                     created_services.append(service)
+                    subscription.increment_services_count()
+                
+                # 6. Marcar onboarding como completado
+                organization.complete_onboarding()
+                registration.mark_completed(user)
                 
                 return Response({
                     'message': 'Onboarding completado exitosamente',
@@ -95,6 +134,16 @@ class OnboardingCompleteView(APIView):
                             'id': str(organization.id),
                             'name': organization.name,
                             'industry_template': organization.industry_template
+                        },
+                        'user': {
+                            'id': str(user.id),
+                            'email': user.email,
+                            'full_name': user.full_name
+                        },
+                        'subscription': {
+                            'plan': registration.selected_plan.name,
+                            'status': subscription.status,
+                            'trial_end': subscription.trial_end
                         },
                         'professionals': [
                             {
@@ -118,3 +167,14 @@ class OnboardingCompleteView(APIView):
             return Response({
                 'error': f'Error al completar onboarding: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _get_industry_settings(self, industry_template):
+        """Obtener configuraciones específicas de la industria"""
+        from core.industry_templates import INDUSTRY_TEMPLATES
+        
+        template = INDUSTRY_TEMPLATES.get(industry_template, INDUSTRY_TEMPLATES['salon'])
+        return {
+            'business_rules': template.get('business_rules', {}),
+            'business_hours': template.get('business_hours', {}),
+            'terminology': template.get('terminology', {})
+        }

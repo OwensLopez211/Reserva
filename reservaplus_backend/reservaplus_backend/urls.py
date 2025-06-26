@@ -1,4 +1,4 @@
-# reservaplus_backend/urls.py - ACTUALIZADO
+# reservaplus_backend/urls.py - URLS ACTUALIZADAS
 
 from django.contrib import admin
 from django.urls import path, include
@@ -14,10 +14,16 @@ urlpatterns = [
         # Autenticación
         path('auth/', include('users.urls')),
         
+        # Planes y registro
+        path('', include('plans.urls')),
+        
+        # Core (onboarding)
+        path('', include('core.urls')),
+        
         # Organizaciones
         path('organizations/', include('organizations.urls')),
         
-        # Appointments - NUEVO
+        # Appointments
         path('appointments/', include('appointments.urls')),
         
         # API Rest Framework (para navegación)

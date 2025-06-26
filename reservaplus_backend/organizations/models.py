@@ -1,4 +1,4 @@
-# organizations/models.py
+# organizations/models.py - ACTUALIZACIONES AL MODELO ORGANIZATION
 
 import uuid
 from django.db import models
@@ -46,7 +46,17 @@ class Organization(models.Model):
     city = models.CharField(max_length=100, blank=True, verbose_name="Ciudad")
     country = models.CharField(max_length=100, default='Chile', verbose_name="País")
     
-    # Configuración de suscripción
+    # NUEVA: Estado del onboarding
+    onboarding_completed = models.BooleanField(
+        default=False,
+        verbose_name="Onboarding Completado"
+    )
+    onboarding_completed_at = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name="Fecha de Completado del Onboarding"
+    )
+    
+    # Configuración de suscripción - DEPRECADO (mantenemos por compatibilidad)
     PLAN_CHOICES = [
         ('free', 'Plan Gratuito'),
         ('basic', 'Plan Básico'),
@@ -57,7 +67,7 @@ class Organization(models.Model):
         max_length=50, 
         choices=PLAN_CHOICES, 
         default='free',
-        verbose_name="Plan de Suscripción"
+        verbose_name="Plan de Suscripción (Deprecado)"
     )
     
     # Configuraciones dinámicas (JSON)
@@ -87,6 +97,26 @@ class Organization(models.Model):
         if not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
+    
+    # NUEVOS: Métodos relacionados con suscripción
+    @property
+    def active_subscription(self):
+        """Obtener suscripción activa"""
+        return getattr(self, 'subscription', None)
+    
+    @property
+    def current_plan(self):
+        """Obtener plan actual"""
+        if self.active_subscription:
+            return self.active_subscription.plan
+        return None
+    
+    def complete_onboarding(self):
+        """Marcar onboarding como completado"""
+        from django.utils import timezone
+        self.onboarding_completed = True
+        self.onboarding_completed_at = timezone.now()
+        self.save(update_fields=['onboarding_completed', 'onboarding_completed_at'])
     
     def get_business_config(self):
         """Obtener configuración de negocio basada en la industria"""
