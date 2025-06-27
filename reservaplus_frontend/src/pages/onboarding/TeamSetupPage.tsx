@@ -1,9 +1,10 @@
-// src/pages/onboarding/TeamSetupPage.tsx - VERSIÓN ACTUALIZADA Y ALINEADA
+// src/pages/onboarding/TeamSetupPage.tsx - SIN LOOPS INFINITOS
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Plus, Trash2, User, Mail, Phone, Users, AlertCircle } from 'lucide-react'
 import { useOnboarding } from '../../contexts/OnboardingContext'
+import { formatPhoneNumber, getPhoneNumbers } from '../../utils/formatters'
 
 const TeamSetupPage: React.FC = () => {
   const navigate = useNavigate()
@@ -16,24 +17,49 @@ const TeamSetupPage: React.FC = () => {
     updateOrganizationData,
     canProceedFromStep,
     nextStep,
-    registrationToken
+    registrationToken,
+    markStepCompleted
   } = useOnboarding()
   
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<{[key: string]: string[]}>({})
   const [selectedIndustry, setSelectedIndustry] = useState<string>('')
+  const [initialized, setInitialized] = useState(false)
 
-  // Cargar datos del formulario de registro
+  // Memorizar el debug info para evitar recálculos constantes
+  const debugInfo = useMemo(() => ({
+    registrationToken: !!registrationToken,
+    professionalsCount: professionals.length,
+    canProceed: canProceedFromStep(2),
+    organizationDataName: organizationData.name,
+    professionals: professionals.map((p, i) => ({
+      index: i,
+      name: p.name,
+      email: p.email,
+      phone: p.phone,
+      hasName: !!p.name?.trim(),
+      hasEmail: !!p.email?.trim(),
+      hasPhone: !!p.phone?.trim(),
+      emailValid: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email || '')
+    }))
+  }), [professionals, registrationToken, canProceedFromStep, organizationData.name])
+
+  // Cargar datos del formulario de registro - SOLO UNA VEZ
   useEffect(() => {
+    // Evitar ejecutar múltiples veces
+    if (initialized) return
+    
     if (!registrationToken) {
       navigate('/onboarding/plan')
       return
     }
 
     const registrationFormData = localStorage.getItem('registration_form_data')
+    
     if (registrationFormData) {
       try {
         const data = JSON.parse(registrationFormData)
+        
         setSelectedIndustry(data.industryTemplate)
         
         // Actualizar datos de organización en el contexto
@@ -50,21 +76,26 @@ const TeamSetupPage: React.FC = () => {
         // Si no hay profesionales, agregar uno inicial con datos del admin
         if (professionals.length === 0) {
           addProfessional()
-          updateProfessional(0, {
-            name: `${data.formData.firstName} ${data.formData.lastName}`,
-            email: data.formData.email,
-            phone: data.formData.phone,
-            specialty: getDefaultSpecialty(data.industryTemplate, 'admin'),
-            accepts_walk_ins: false
-          })
+          // Usar setTimeout para asegurar que el estado se actualice
+          setTimeout(() => {
+            updateProfessional(0, {
+              name: `${data.formData.firstName} ${data.formData.lastName}`,
+              email: data.formData.email,
+              phone: formatPhoneNumber(getPhoneNumbers(data.formData.phone)),
+              specialty: getDefaultSpecialty(data.industryTemplate, 'admin'),
+              accepts_walk_ins: false
+            })
+          }, 100)
         }
       } catch (error) {
         console.error('Error parsing registration data:', error)
       }
     }
-  }, [registrationToken, navigate, updateOrganizationData, professionals.length, addProfessional, updateProfessional])
+    
+    setInitialized(true)
+  }, [registrationToken, navigate, initialized]) // Dependencias mínimas
 
-  const getDefaultSpecialty = (industry: string, role: 'admin' | 'professional'): string => {
+  const getDefaultSpecialty = useCallback((industry: string, role: 'admin' | 'professional'): string => {
     const specialties: {[key: string]: {admin: string, professional: string}} = {
       salon: { admin: 'Director/Propietario', professional: 'Estilista' },
       clinic: { admin: 'Director Médico', professional: 'Doctor' },
@@ -76,9 +107,9 @@ const TeamSetupPage: React.FC = () => {
     }
 
     return specialties[industry]?.[role] || (role === 'admin' ? 'Director' : 'Profesional')
-  }
+  }, [])
 
-  const getIndustryTerms = (industry: string) => {
+  const getIndustryTerms = useCallback((industry: string) => {
     const terms: {[key: string]: {professional: string, professionals: string}} = {
       salon: { professional: 'Estilista', professionals: 'Estilistas' },
       clinic: { professional: 'Doctor', professionals: 'Doctores' },
@@ -90,9 +121,9 @@ const TeamSetupPage: React.FC = () => {
     }
 
     return terms[industry] || { professional: 'Profesional', professionals: 'Profesionales' }
-  }
+  }, [])
 
-  const handleAddProfessional = () => {
+  const handleAddProfessional = useCallback(() => {
     if (professionals.length >= 3) {
       alert('El Plan Básico permite máximo 3 profesionales + administrador')
       return
@@ -101,84 +132,146 @@ const TeamSetupPage: React.FC = () => {
     addProfessional()
     // Actualizar con especialidad por defecto
     setTimeout(() => {
-      updateProfessional(professionals.length, {
+      const newIndex = professionals.length
+      updateProfessional(newIndex, {
         specialty: getDefaultSpecialty(selectedIndustry, 'professional')
       })
     }, 100)
-  }
+  }, [professionals.length, addProfessional, updateProfessional, getDefaultSpecialty, selectedIndustry])
 
-  const handleRemoveProfessional = (index: number) => {
+  const handleRemoveProfessional = useCallback((index: number) => {
     if (index === 0) {
       alert('No puedes eliminar al administrador principal')
       return
     }
     
     removeProfessional(index)
-  }
+  }, [removeProfessional])
 
-  const handleUpdateProfessional = (index: number, field: string, value: string | boolean) => {
-    updateProfessional(index, { [field]: value })
+  const handleUpdateProfessional = useCallback((index: number, field: string, value: string | boolean) => {
+    let processedValue = value
+    
+    // Formatear números de teléfono en tiempo real
+    if (field === 'phone' && typeof value === 'string') {
+      processedValue = formatPhoneNumber(value)
+    }
+    
+    updateProfessional(index, { [field]: processedValue })
 
     // Limpiar errores cuando el usuario empiece a escribir
-    if (errors[`${index}.${field}`]) {
-      setErrors(prev => {
+    setErrors(prev => {
+      if (prev[`${index}.${field}`]) {
         const newErrors = { ...prev }
         delete newErrors[`${index}.${field}`]
         return newErrors
-      })
-    }
-  }
+      }
+      return prev
+    })
+  }, [updateProfessional])
 
-  const validateForm = (): boolean => {
+  const validateForm = useCallback((): boolean => {
     const newErrors: {[key: string]: string[]} = {}
 
     professionals.forEach((professional, index) => {
-      if (!professional.name.trim()) {
+      if (!professional.name?.trim()) {
         newErrors[`${index}.name`] = ['El nombre es requerido']
       }
-      if (!professional.email.trim()) {
+      if (!professional.email?.trim()) {
         newErrors[`${index}.email`] = ['El email es requerido']
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(professional.email)) {
         newErrors[`${index}.email`] = ['Email inválido']
       }
-      if (!professional.phone.trim()) {
+      if (!professional.phone?.trim()) {
         newErrors[`${index}.phone`] = ['El teléfono es requerido']
       }
 
       // Verificar emails duplicados
       const emailCount = professionals.filter(p => p.email === professional.email).length
-      if (emailCount > 1 && professional.email.trim()) {
+      if (emailCount > 1 && professional.email?.trim()) {
         newErrors[`${index}.email`] = ['Este email ya está en uso']
       }
     })
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
-  }
+  }, [professionals])
 
-  const handleSubmit = async () => {
-    if (!validateForm()) return
+  const handleSubmit = useCallback(async () => {
+    if (!validateForm()) {
+      return
+    }
+
+    // Verificar que tengamos al menos un profesional válido
+    if (professionals.length === 0) {
+      alert('Debes agregar al menos un profesional')
+      return
+    }
 
     setIsLoading(true)
+    
     try {
-      // Usar el método del contexto para avanzar
-      nextStep()
+      // Marcar paso como completado en el contexto
+      markStepCompleted(2)
+      
+      // Navegar directamente a la página de servicios
+      navigate('/onboarding/services')
     } catch (error) {
       console.error('Error al guardar equipo:', error)
+      alert('Error al guardar el equipo. Por favor intenta de nuevo.')
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [validateForm, professionals.length, markStepCompleted, navigate])
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     navigate('/onboarding/register')
-  }
+  }, [navigate])
 
-  const industryTerms = getIndustryTerms(selectedIndustry)
-  const canProceed = canProceedFromStep(2) // Step 2 es Team
+  const industryTerms = useMemo(() => getIndustryTerms(selectedIndustry), [getIndustryTerms, selectedIndustry])
+  const canProceed = useMemo(() => canProceedFromStep(2), [canProceedFromStep])
+
+  // Solo mostrar debug info en desarrollo y evitar logs infinitos
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      // Solo logear cambios significativos
+      console.log('TeamSetup state change:', {
+        professionalsLength: professionals.length,
+        canProceed,
+        initialized
+      })
+      
+      // 🔍 DEBUG TEMPORAL: Verificar por qué canProceed es false
+      console.log('🔍 DEBUG - Validación de profesionales:')
+      professionals.forEach((p, index) => {
+        const hasName = !!(p.name?.trim())
+        const hasEmail = !!(p.email?.trim())
+        const hasPhone = !!(p.phone?.trim())
+        const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email || '')
+        
+        console.log(`Profesional ${index}:`, {
+          name: p.name,
+          email: p.email,
+          phone: p.phone,
+          hasName,
+          hasEmail,
+          hasPhone,
+          isValidEmail,
+          isValid: hasName && hasEmail && hasPhone && isValidEmail
+        })
+      })
+    }
+  }, [professionals.length, canProceed, initialized, professionals])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-blue-50">
+      {/* Debug Info - Solo en desarrollo */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-yellow-100 border border-yellow-400 p-4 text-xs">
+          <h4 className="font-bold">Debug Info:</h4>
+          <p>Professionals: {debugInfo.professionalsCount} | Can Proceed: {debugInfo.canProceed ? 'Yes' : 'No'} | Initialized: {initialized ? 'Yes' : 'No'}</p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -291,13 +384,13 @@ const TeamSetupPage: React.FC = () => {
                         <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                         <input
                           type="text"
-                          value={professional.name}
+                          value={professional.name || ''}
                           onChange={(e) => handleUpdateProfessional(index, 'name', e.target.value)}
                           className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                             errors[`${index}.name`] ? 'border-red-300' : 'border-gray-300'
                           }`}
                           placeholder="Juan Pérez"
-                          disabled={index === 0}
+                          readOnly={index === 0}
                         />
                       </div>
                       {errors[`${index}.name`] && (
@@ -316,13 +409,13 @@ const TeamSetupPage: React.FC = () => {
                         <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                         <input
                           type="email"
-                          value={professional.email}
+                          value={professional.email || ''}
                           onChange={(e) => handleUpdateProfessional(index, 'email', e.target.value)}
                           className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                             errors[`${index}.email`] ? 'border-red-300' : 'border-gray-300'
                           }`}
                           placeholder="juan@ejemplo.com"
-                          disabled={index === 0}
+                          readOnly={index === 0}
                         />
                       </div>
                       {errors[`${index}.email`] && (
@@ -341,7 +434,7 @@ const TeamSetupPage: React.FC = () => {
                         <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                         <input
                           type="tel"
-                          value={professional.phone}
+                          value={professional.phone || ''}
                           onChange={(e) => handleUpdateProfessional(index, 'phone', e.target.value)}
                           className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                             errors[`${index}.phone`] ? 'border-red-300' : 'border-gray-300'
@@ -363,7 +456,7 @@ const TeamSetupPage: React.FC = () => {
                       </label>
                       <input
                         type="text"
-                        value={professional.specialty}
+                        value={professional.specialty || ''}
                         onChange={(e) => handleUpdateProfessional(index, 'specialty', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         placeholder={`Ej: ${getDefaultSpecialty(selectedIndustry, index === 0 ? 'admin' : 'professional')}`}
@@ -380,7 +473,7 @@ const TeamSetupPage: React.FC = () => {
                           </div>
                           <input
                             type="checkbox"
-                            checked={professional.accepts_walk_ins}
+                            checked={professional.accepts_walk_ins || false}
                             onChange={(e) => handleUpdateProfessional(index, 'accepts_walk_ins', e.target.checked)}
                             className="w-6 h-6 text-emerald-600 rounded"
                           />
@@ -415,8 +508,33 @@ const TeamSetupPage: React.FC = () => {
                 </p>
               </div>
             )}
+
+            {/* Empty state */}
+            {professionals.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-gray-500 mb-4">No hay profesionales configurados</p>
+                <button
+                  onClick={handleAddProfessional}
+                  className="px-6 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600"
+                >
+                  Agregar primer profesional
+                </button>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Validation Summary */}
+        {Object.keys(errors).length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-8">
+            <h4 className="font-medium text-red-900 mb-2">Errores de validación:</h4>
+            <ul className="text-sm text-red-700 space-y-1">
+              {Object.entries(errors).map(([field, fieldErrors]) => (
+                <li key={field}>• {fieldErrors[0]}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Navigation Buttons */}
         <div className="flex justify-between">
@@ -430,7 +548,7 @@ const TeamSetupPage: React.FC = () => {
 
           <button
             onClick={handleSubmit}
-            disabled={isLoading || !canProceed}
+            disabled={isLoading || (!canProceed && professionals.length === 0)}
             className="flex items-center px-8 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             {isLoading ? (
@@ -445,6 +563,20 @@ const TeamSetupPage: React.FC = () => {
               </>
             )}
           </button>
+          
+          {/* 🔧 BOTÓN TEMPORAL DE DEBUG - QUITAR DESPUÉS */}
+          {process.env.NODE_ENV === 'development' && !canProceed && (
+            <button
+              onClick={() => {
+                console.log('🚨 FORZANDO NAVEGACIÓN - SOLO PARA DEBUG')
+                console.log('Datos actuales:', { professionals })
+                nextStep()
+              }}
+              className="flex items-center px-8 py-3 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 ml-4"
+            >
+              🔧 DEBUG: Forzar Avance
+            </button>
+          )}
         </div>
 
         {/* Info Box */}
@@ -470,18 +602,10 @@ const TeamSetupPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Validation Notice */}
-        {!canProceed && professionals.length > 0 && (
-          <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-            <div className="flex items-center">
-              <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
-              <div className="text-sm text-yellow-800">
-                <p className="font-medium">Completa la información requerida</p>
-                <p>Asegúrate de que todos los profesionales tengan nombre, email y teléfono válidos.</p>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Status indicator */}
+        <div className="mt-4 text-center text-sm text-gray-500">
+          Estado: {canProceed ? '✅ Listo para continuar' : '⚠️ Completa los campos requeridos'}
+        </div>
       </div>
     </div>
   )

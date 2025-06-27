@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Plus, Trash2, Clock, DollarSign, Tag, AlertCircle, Lightbulb } from 'lucide-react'
 import { useOnboarding } from '../../contexts/OnboardingContext'
+import { formatPriceWithSymbol, formatPriceInput, getPriceNumber } from '../../utils/formatters'
 
 const ServicesSetupPage: React.FC = () => {
   const navigate = useNavigate()
@@ -15,13 +16,15 @@ const ServicesSetupPage: React.FC = () => {
     loadSuggestedServices,
     organizationData,
     canProceedFromStep,
-    nextStep,
+    completeOnboarding,
+    isCompleting,
     registrationToken
   } = useOnboarding()
   
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<{[key: string]: string[]}>({})
   const [showSuggested, setShowSuggested] = useState(true)
+  const [completionError, setCompletionError] = useState<string>('')
 
   // Cargar servicios sugeridos basados en la industria
   useEffect(() => {
@@ -89,7 +92,14 @@ const ServicesSetupPage: React.FC = () => {
   ]
 
   const handleUpdateService = (index: number, field: string, value: string | number | boolean) => {
-    updateService(index, { [field]: value })
+    // Formatear precios en tiempo real
+    if (field === 'price' && typeof value === 'string') {
+      const formattedPrice = formatPriceInput(value)
+      // Actualizar el estado con el valor formateado
+      updateService(index, { [field]: getPriceNumber(formattedPrice) })
+    } else {
+      updateService(index, { [field]: value })
+    }
 
     // Limpiar errores cuando el usuario empiece a escribir
     if (errors[`${index}.${field}`]) {
@@ -101,7 +111,7 @@ const ServicesSetupPage: React.FC = () => {
     }
   }
 
-  const handleAddService = (suggested?: any) => {
+  const handleAddService = (suggested?: Partial<typeof services[0]>) => {
     if (services.length >= 20) {
       alert('El Plan Básico permite máximo 20 servicios')
       return
@@ -114,7 +124,7 @@ const ServicesSetupPage: React.FC = () => {
     removeService(index)
   }
 
-  const handleAddSuggestedService = (suggested: any) => {
+  const handleAddSuggestedService = (suggested: Partial<typeof services[0]>) => {
     handleAddService(suggested)
   }
 
@@ -138,13 +148,48 @@ const ServicesSetupPage: React.FC = () => {
   }
 
   const handleSubmit = async () => {
-    if (!validateForm()) return
+    // Limpiar errores previos
+    setCompletionError('')
+    
+    // Validar formulario
+    if (!validateForm()) {
+      setCompletionError('Por favor, completa todos los campos requeridos.')
+      return
+    }
+
+    // Verificar que tengamos al menos un servicio
+    if (services.length === 0) {
+      setCompletionError('Debes agregar al menos un servicio para continuar.')
+      return
+    }
 
     setIsLoading(true)
     try {
-      nextStep()
-    } catch (error) {
-      console.error('Error al guardar servicios:', error)
+      console.log('🎯 Iniciando finalización del onboarding...')
+      
+      // Completar el onboarding (esto llama al backend)
+      await completeOnboarding()
+      
+      console.log('✅ Onboarding completado exitosamente')
+      
+      // Navegar al dashboard después del éxito
+      navigate('/dashboard', { replace: true })
+      
+         } catch (error: unknown) {
+       console.error('❌ Error al finalizar onboarding:', error)
+       
+       // Manejar diferentes tipos de errores
+       const errorMessage = error instanceof Error ? error.message : String(error)
+       
+       if (errorMessage.includes('Token')) {
+         setCompletionError('Sesión expirada. Por favor, reinicia el proceso de registro.')
+       } else if (errorMessage.includes('Datos inválidos')) {
+         setCompletionError('Algunos datos no son válidos. Revisa la información ingresada.')
+       } else if (errorMessage.includes('límite')) {
+         setCompletionError('Has excedido los límites de tu plan. Ajusta la cantidad de servicios.')
+       } else {
+         setCompletionError(errorMessage || 'Error al completar el registro. Por favor, intenta de nuevo.')
+       }
     } finally {
       setIsLoading(false)
     }
@@ -170,7 +215,7 @@ const ServicesSetupPage: React.FC = () => {
               <h1 className="text-2xl font-bold text-gray-900">Reserva+</h1>
             </div>
             <div className="text-sm text-gray-500">
-              Paso 4 de 6
+              Último Paso - Finalizando
             </div>
           </div>
         </div>
@@ -234,7 +279,7 @@ const ServicesSetupPage: React.FC = () => {
                   <div className="font-medium text-gray-900">{service.name}</div>
                   <div className="text-sm text-gray-600">{service.description}</div>
                   <div className="text-sm text-yellow-700 mt-1">
-                    ${service.price.toLocaleString()} • {service.duration_minutes} min
+                    {formatPriceWithSymbol(service.price)} • {service.duration_minutes} min
                   </div>
                 </button>
               ))}
@@ -319,14 +364,13 @@ const ServicesSetupPage: React.FC = () => {
                       <div className="relative">
                         <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                         <input
-                          type="number"
-                          value={service.price}
-                          onChange={(e) => handleUpdateService(index, 'price', parseInt(e.target.value) || 0)}
+                          type="text"
+                          value={service.price ? formatPriceInput(service.price.toString()) : ''}
+                          onChange={(e) => handleUpdateService(index, 'price', e.target.value)}
                           className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                             errors[`${index}.price`] ? 'border-red-300' : 'border-gray-300'
                           }`}
-                          placeholder="15000"
-                          min="0"
+                          placeholder="15.000"
                         />
                       </div>
                       {errors[`${index}.price`] && (
@@ -489,11 +533,25 @@ const ServicesSetupPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Completion Error */}
+        {completionError && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
+            <div className="flex items-center">
+              <AlertCircle className="w-5 h-5 text-red-600 mr-2 flex-shrink-0" />
+              <div className="text-sm text-red-800">
+                <p className="font-medium">Error al completar registro</p>
+                <p>{completionError}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Navigation Buttons */}
         <div className="flex justify-between">
           <button
             onClick={handleBack}
-            className="flex items-center px-6 py-3 text-gray-600 hover:text-gray-800 transition-colors"
+            disabled={isLoading || isCompleting}
+            className="flex items-center px-6 py-3 text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
             Volver al Equipo
@@ -501,13 +559,13 @@ const ServicesSetupPage: React.FC = () => {
 
           <button
             onClick={handleSubmit}
-            disabled={isLoading || !canProceed}
+            disabled={isLoading || isCompleting || services.length === 0}
             className="flex items-center px-8 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
-            {isLoading ? (
+            {(isLoading || isCompleting) ? (
               <>
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                Guardando...
+                {isCompleting ? 'Finalizando registro...' : 'Validando...'}
               </>
             ) : (
               <>
@@ -518,24 +576,26 @@ const ServicesSetupPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Info Box */}
-        <div className="mt-8 bg-emerald-50 border border-emerald-200 rounded-xl p-6">
+        {/* Final Notice Box */}
+        <div className="mt-8 bg-gradient-to-r from-emerald-50 to-cyan-50 border-2 border-emerald-200 rounded-xl p-6">
           <div className="flex items-start">
             <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center mr-3 mt-1">
-              <Tag className="w-4 h-4 text-emerald-600" />
+              <ArrowRight className="w-4 h-4 text-emerald-600" />
             </div>
             <div>
-              <h4 className="font-medium text-emerald-900 mb-2">Plan Básico - Límites de {industryTerms.services}</h4>
-              <ul className="text-sm text-emerald-700 space-y-1">
-                <li>• Hasta 20 {industryTerms.services.toLowerCase()} diferentes</li>
-                <li>• Precios y duraciones personalizables</li>
-                <li>• Categorización automática</li>
-                <li>• Configuración de tiempos de preparación</li>
-                <li>• Activación/desactivación individual</li>
+              <h4 className="font-medium text-emerald-900 mb-2">¡Casi terminamos!</h4>
+              <p className="text-sm text-emerald-700 mb-3">
+                Al finalizar se creará tu organización con toda la configuración que has establecido:
+              </p>
+              <ul className="text-sm text-emerald-700 space-y-1 mb-3">
+                <li>✓ Organización: <span className="font-medium">{organizationData.name}</span></li>
+                <li>✓ Equipo configurado</li>
+                <li>✓ {services.length} {industryTerms.services.toLowerCase()} listos</li>
+                <li>✓ Todo listo para recibir reservas</li>
               </ul>
-              <div className="mt-3 text-sm">
-                <span className="font-medium text-emerald-900">Progreso actual:</span>
-                <span className="ml-2 text-emerald-700">{services.length}/20 {industryTerms.services.toLowerCase()}</span>
+              <div className="text-sm">
+                <span className="font-medium text-emerald-900">Después podrás:</span>
+                <span className="ml-2 text-emerald-700">• Configurar horarios • Agregar más servicios • Gestionar reservas</span>
               </div>
             </div>
           </div>
@@ -566,7 +626,7 @@ const ServicesSetupPage: React.FC = () => {
                     <div className="text-sm text-gray-500">{service.category}</div>
                   </div>
                   <div className="text-right">
-                    <div className="font-medium text-emerald-600">${service.price?.toLocaleString()}</div>
+                    <div className="font-medium text-emerald-600">{formatPriceWithSymbol(service.price || 0)}</div>
                     <div className="text-sm text-gray-500">{service.duration_minutes} min</div>
                   </div>
                 </div>

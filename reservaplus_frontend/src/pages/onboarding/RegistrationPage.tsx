@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Check, AlertCircle, User, Building, Mail, Phone, MapPin, Globe } from 'lucide-react'
 import { OnboardingService } from '../../services/onboardingService'
 import { useOnboarding } from '../../contexts/OnboardingContext'
+import { formatPriceWithPeriod, formatPhoneNumber, getPhoneNumbers } from '../../utils/formatters'
 
 interface RegistrationData {
   // Datos del usuario admin
@@ -153,7 +154,14 @@ const RegistrationPage: React.FC = () => {
   ]
 
   const handleInputChange = (field: keyof RegistrationData, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    let processedValue = value
+    
+    // Formatear números de teléfono en tiempo real
+    if ((field === 'phone' || field === 'businessPhone') && typeof value === 'string') {
+      processedValue = formatPhoneNumber(value)
+    }
+    
+    setFormData(prev => ({ ...prev, [field]: processedValue }))
     
     // Limpiar errores del campo cuando el usuario empiece a escribir
     if (errors[field]) {
@@ -171,7 +179,7 @@ const RegistrationPage: React.FC = () => {
 
     // Auto-completar teléfono de negocio si no está definido
     if (field === 'phone' && !formData.businessPhone) {
-      setFormData(prev => ({ ...prev, businessPhone: value as string }))
+      setFormData(prev => ({ ...prev, businessPhone: processedValue as string }))
     }
   }
 
@@ -259,11 +267,15 @@ const RegistrationPage: React.FC = () => {
       if (tokenValid) {
         // Guardar datos adicionales del formulario para usar en pasos posteriores
         const additionalData = {
-          formData,
+          formData: {
+            ...formData,
+            phone: getPhoneNumbers(formData.phone),
+            businessPhone: getPhoneNumbers(formData.businessPhone)
+          },
           industryTemplate: formData.industryTemplate,
           businessInfo: {
             email: formData.businessEmail,
-            phone: formData.businessPhone,
+            phone: getPhoneNumbers(formData.businessPhone),
             address: formData.address,
             city: formData.city,
             country: formData.country
@@ -359,7 +371,7 @@ const RegistrationPage: React.FC = () => {
               <div>
                 <h3 className="font-semibold text-gray-900">{selectedPlan.name} Seleccionado</h3>
                 <p className="text-gray-600">
-                  ${price?.toLocaleString()} {billingCycle === 'monthly' ? '/mes' : '/año'}
+                  {formatPriceWithPeriod(price || 0, billingCycle === 'monthly' ? '/mes' : '/año')}
                   <span className="ml-2 text-emerald-600">• 14 días gratis</span>
                 </p>
               </div>

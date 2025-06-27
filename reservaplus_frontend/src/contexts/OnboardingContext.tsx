@@ -1,6 +1,6 @@
-// src/contexts/OnboardingContext.tsx - VERSIÓN CORREGIDA Y ALINEADA
+// src/contexts/OnboardingContext.tsx - SIN LOOPS INFINITOS
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'
 import { OnboardingService } from '../services/onboardingService'
 
 // Tipos alineados con el backend
@@ -106,8 +106,11 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   const [professionals, setProfessionals] = useState<ProfessionalData[]>([])
   const [services, setServices] = useState<ServiceData[]>([])
 
+  // Flag para evitar inicialización múltiple
+  const [initialized, setInitialized] = useState(false)
+
   // Configuración de pasos
-  const totalSteps = 6 // 0: Plan, 1: Register, 2: Team, 3: Organization, 4: Payment, 5: Welcome
+  const totalSteps = 6
   
   // Colores predefinidos para profesionales
   const professionalColors = [
@@ -115,16 +118,20 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     '#795548', '#607D8B', '#E91E63', '#00BCD4', '#CDDC39'
   ]
 
-  // Inicializar desde localStorage al cargar
-  useEffect(() => {
-    const token = OnboardingService.getStoredToken()
-    if (token) {
-      initializeFromToken(token)
+  // Guardar progreso en localStorage - usando useCallback para evitar recreación
+  const saveProgress = useCallback(() => {
+    const progressData = {
+      currentStep,
+      completedSteps,
+      organizationData,
+      professionals,
+      services
     }
-  }, [])
+    localStorage.setItem('onboarding_progress', JSON.stringify(progressData))
+  }, [currentStep, completedSteps, organizationData, professionals, services])
 
-  // Inicializar desde token de registro
-  const initializeFromToken = async (token: string): Promise<boolean> => {
+  // Inicializar desde token de registro - usando useCallback
+  const initializeFromToken = useCallback(async (token: string): Promise<boolean> => {
     try {
       const status = await OnboardingService.checkRegistrationStatus(token)
       
@@ -135,74 +142,125 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         // Cargar datos guardados si existen
         const savedData = localStorage.getItem('onboarding_progress')
         if (savedData) {
-          const parsed = JSON.parse(savedData)
-          if (parsed.organizationData) setOrganizationData(parsed.organizationData)
-          if (parsed.professionals) setProfessionals(parsed.professionals)
-          if (parsed.services) setServices(parsed.services)
-          if (parsed.currentStep !== undefined) setCurrentStep(parsed.currentStep)
-          if (parsed.completedSteps) setCompletedSteps(parsed.completedSteps)
+          try {
+            const parsed = JSON.parse(savedData)
+            
+            if (parsed.organizationData) setOrganizationData(parsed.organizationData)
+            if (parsed.professionals) setProfessionals(parsed.professionals)
+            if (parsed.services) setServices(parsed.services)
+            if (parsed.currentStep !== undefined) setCurrentStep(parsed.currentStep)
+            if (parsed.completedSteps) setCompletedSteps(parsed.completedSteps)
+          } catch (e) {
+            console.error('Error parsing saved progress:', e)
+          }
         }
         
+        setInitialized(true)
         return true
       } else {
-        // Token inválido, limpiar
         OnboardingService.clearOnboardingData()
         setRegistrationToken(null)
+        setInitialized(true)
         return false
       }
     } catch (error) {
       console.error('Error al inicializar desde token:', error)
+      setInitialized(true)
       return false
     }
-  }
+  }, [])
 
-  // Guardar progreso en localStorage
-  const saveProgress = () => {
-    const progressData = {
-      currentStep,
-      completedSteps,
-      organizationData,
-      professionals,
-      services
+  // Inicializar desde localStorage al cargar - SOLO UNA VEZ
+  useEffect(() => {
+    if (!initialized) {
+      const token = OnboardingService.getStoredToken()
+      if (token) {
+        initializeFromToken(token)
+      } else {
+        setInitialized(true)
+      }
     }
-    localStorage.setItem('onboarding_progress', JSON.stringify(progressData))
-  }
+  }, [initialized, initializeFromToken])
 
-  // Métodos de navegación
-  const nextStep = () => {
+  // Validación usando useCallback para evitar recreación constante
+  const canProceedFromStep = useCallback((step: number): boolean => {
+    switch (step) {
+      case 0: // Plan selection
+        return !!registrationToken
+        
+      case 1: // Registration
+        return !!registrationToken
+        
+      case 2: // Team
+        if (professionals.length === 0) {
+          return false
+        }
+        
+        return professionals.every((p) => {
+          const hasRequired = !!(p.name?.trim() && p.email?.trim() && p.phone?.trim())
+          const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email || '')
+          return hasRequired && isValidEmail
+        })
+        
+      case 3: // Services
+        return services.length > 0 && 
+               services.every(s => s.name?.trim() && s.price > 0 && s.duration_minutes > 0)
+               
+      case 4: // Complete
+        return true
+        
+      case 5: // Welcome
+        return true
+        
+      default:
+        return false
+    }
+  }, [registrationToken, professionals, services])
+
+  // Métodos de navegación usando useCallback
+  const nextStep = useCallback(() => {
     if (currentStep < totalSteps - 1 && canProceedFromStep(currentStep)) {
-      markStepCompleted(currentStep)
+      const newCompletedSteps = [...completedSteps]
+      if (!newCompletedSteps.includes(currentStep)) {
+        newCompletedSteps.push(currentStep)
+      }
+      
       const newStep = currentStep + 1
       setCurrentStep(newStep)
-      saveProgress()
+      setCompletedSteps(newCompletedSteps)
+      
+      // Guardar después de actualizar el estado
+      setTimeout(() => {
+        saveProgress()
+      }, 100)
     }
-  }
+  }, [currentStep, totalSteps, canProceedFromStep, completedSteps, saveProgress])
 
-  const prevStep = () => {
+  const prevStep = useCallback(() => {
     if (currentStep > 0) {
-      const newStep = currentStep - 1
-      setCurrentStep(newStep)
-      saveProgress()
+      setCurrentStep(currentStep - 1)
+      setTimeout(() => {
+        saveProgress()
+      }, 100)
     }
-  }
+  }, [currentStep, saveProgress])
 
-  const markStepCompleted = (step: number) => {
-    if (!completedSteps.includes(step)) {
-      const newCompleted = [...completedSteps, step]
-      setCompletedSteps(newCompleted)
-      saveProgress()
-    }
-  }
+  const markStepCompleted = useCallback((step: number) => {
+    setCompletedSteps(prev => {
+      if (!prev.includes(step)) {
+        const newCompleted = [...prev, step]
+        return newCompleted
+      }
+      return prev
+    })
+  }, [])
 
-  // Métodos de datos de organización
-  const updateOrganizationData = (data: Partial<OrganizationData>) => {
-    const newData = { ...organizationData, ...data }
-    setOrganizationData(newData)
-    saveProgress()
-  }
+  // Métodos de datos usando useCallback
+  const updateOrganizationData = useCallback((data: Partial<OrganizationData>) => {
+    setOrganizationData(prev => ({ ...prev, ...data }))
+  }, [])
 
-  // Métodos de profesionales
-  const addProfessional = () => {
+  const addProfessional = useCallback(() => {
     const newProfessional: ProfessionalData = {
       name: '',
       email: '',
@@ -211,26 +269,24 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       color_code: professionalColors[professionals.length % professionalColors.length],
       accepts_walk_ins: true
     }
-    const newProfessionals = [...professionals, newProfessional]
-    setProfessionals(newProfessionals)
-    saveProgress()
-  }
+    setProfessionals(prev => [...prev, newProfessional])
+  }, [professionals.length, professionalColors])
 
-  const updateProfessional = (index: number, data: Partial<ProfessionalData>) => {
-    const updated = [...professionals]
-    updated[index] = { ...updated[index], ...data }
-    setProfessionals(updated)
-    saveProgress()
-  }
+  const updateProfessional = useCallback((index: number, data: Partial<ProfessionalData>) => {
+    setProfessionals(prev => {
+      const updated = [...prev]
+      if (updated[index]) {
+        updated[index] = { ...updated[index], ...data }
+      }
+      return updated
+    })
+  }, [])
 
-  const removeProfessional = (index: number) => {
-    const filtered = professionals.filter((_, i) => i !== index)
-    setProfessionals(filtered)
-    saveProgress()
-  }
+  const removeProfessional = useCallback((index: number) => {
+    setProfessionals(prev => prev.filter((_, i) => i !== index))
+  }, [])
 
-  // Métodos de servicios
-  const addService = (suggested?: Partial<ServiceData>) => {
+  const addService = useCallback((suggested?: Partial<ServiceData>) => {
     const newService: ServiceData = {
       name: suggested?.name || '',
       description: suggested?.description || '',
@@ -242,63 +298,38 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       is_active: suggested?.is_active ?? true,
       requires_preparation: suggested?.requires_preparation ?? false
     }
-    const newServices = [...services, newService]
-    setServices(newServices)
-    saveProgress()
-  }
+    setServices(prev => [...prev, newService])
+  }, [])
 
-  const updateService = (index: number, data: Partial<ServiceData>) => {
-    const updated = [...services]
-    updated[index] = { ...updated[index], ...data }
-    setServices(updated)
-    saveProgress()
-  }
+  const updateService = useCallback((index: number, data: Partial<ServiceData>) => {
+    setServices(prev => {
+      const updated = [...prev]
+      if (updated[index]) {
+        updated[index] = { ...updated[index], ...data }
+      }
+      return updated
+    })
+  }, [])
 
-  const removeService = (index: number) => {
-    const filtered = services.filter((_, i) => i !== index)
-    setServices(filtered)
-    saveProgress()
-  }
+  const removeService = useCallback((index: number) => {
+    setServices(prev => prev.filter((_, i) => i !== index))
+  }, [])
 
-  const loadSuggestedServices = (industryType: string) => {
+  const loadSuggestedServices = useCallback((industryType: string) => {
     const suggested = OnboardingService.getSuggestedServices(industryType)
     setServices(suggested)
-    saveProgress()
-  }
+  }, [])
 
-  // Validación
-  const canProceedFromStep = (step: number): boolean => {
-    switch (step) {
-      case 0: // Plan selection
-        return !!registrationToken
-      case 1: // Registration - ya debería estar validado por el token
-        return !!registrationToken
-      case 2: // Team
-        return professionals.length > 0 && 
-               professionals.every(p => p.name?.trim() && p.email?.trim())
-      case 3: // Organization
-        return !!(organizationData.name?.trim() && 
-                 organizationData.email?.trim() && 
-                 organizationData.phone?.trim())
-      case 4: // Payment
-        return true // El pago se maneja en el servidor
-      case 5: // Welcome
-        return true
-      default:
-        return false
-    }
-  }
-
-  const validateCurrentData = () => {
+  const validateCurrentData = useCallback(() => {
     return OnboardingService.validateOnboardingData({
       organization: organizationData,
       professionals,
       services
     })
-  }
+  }, [organizationData, professionals, services])
 
   // Finalización del onboarding
-  const completeOnboarding = async () => {
+  const completeOnboarding = useCallback(async () => {
     if (!registrationToken) {
       throw new Error('No se encontró token de registro')
     }
@@ -329,10 +360,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         }))
       }
 
-      console.log('🔄 Completando onboarding:', onboardingData)
       const result = await OnboardingService.completeOnboarding(onboardingData)
-      
-      console.log('✅ Onboarding completado:', result)
       
       // Limpiar datos temporales
       OnboardingService.clearOnboardingData()
@@ -340,15 +368,15 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       
       return result
     } catch (error) {
-      console.error('❌ Error completando onboarding:', error)
+      console.error('Error completando onboarding:', error)
       throw error
     } finally {
       setIsCompleting(false)
     }
-  }
+  }, [registrationToken, organizationData, professionals, services, markStepCompleted, currentStep])
 
   // Reset del onboarding
-  const resetOnboarding = () => {
+  const resetOnboarding = useCallback(() => {
     setCurrentStep(0)
     setCompletedSteps([])
     setIsCompleting(false)
@@ -365,8 +393,9 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     })
     setProfessionals([])
     setServices([])
+    setInitialized(false)
     OnboardingService.clearOnboardingData()
-  }
+  }, [])
 
   const value: OnboardingContextType = {
     // Estado
@@ -429,23 +458,49 @@ export const useOnboardingStatus = () => {
   const [loading, setLoading] = useState(true)
 
   React.useEffect(() => {
+    let isMounted = true
+    
+    const checkOnboardingStatus = async () => {
+      try {
+        setLoading(true)
+        
+        const status = await OnboardingService.checkOnboardingStatus()
+        
+        if (isMounted) {
+          setNeedsOnboarding(status.needsOnboarding)
+        }
+        
+      } catch (error) {
+        console.error('Error checking onboarding status:', error)
+        if (isMounted) {
+          setNeedsOnboarding(true)
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
+    }
+
     checkOnboardingStatus()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
-  const checkOnboardingStatus = async () => {
+  const recheckOnboardingStatus = useCallback(async () => {
     try {
       setLoading(true)
-      
       const status = await OnboardingService.checkOnboardingStatus()
       setNeedsOnboarding(status.needsOnboarding)
-      
     } catch (error) {
       console.error('Error checking onboarding status:', error)
       setNeedsOnboarding(true)
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  return { needsOnboarding, loading, recheckOnboardingStatus: checkOnboardingStatus }
+  return { needsOnboarding, loading, recheckOnboardingStatus }
 }

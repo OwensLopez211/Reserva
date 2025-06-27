@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { Check, Star } from 'lucide-react'
 import PricingCard from '../../components/pricing/PricingCard'
 import { OnboardingService } from '../../services/onboardingService'
+import { formatPrice } from '../../utils/formatters'
 
 interface Plan {
   id: string
@@ -99,19 +100,19 @@ const PlanSelectionPage: React.FC = () => {
     }
   }
 
-  const formatPrice = (plan: Plan) => {
+  const formatPlanPrice = (plan: Plan) => {
     const price = selectedBilling === 'monthly' ? plan.price_monthly : (plan.price_yearly || plan.price_monthly * 12)
-    return price.toLocaleString()
+    return formatPrice(price)
   }
 
   const formatOriginalPrice = (plan: Plan) => {
     if (selectedBilling === 'monthly' && plan.original_price) {
-      return plan.original_price.toLocaleString()
+      return formatPrice(plan.original_price)
     }
     // Para anual, calcular descuento si existe
     if (selectedBilling === 'yearly' && plan.price_yearly && plan.price_monthly) {
       const originalYearly = plan.price_monthly * 12
-      return originalYearly.toLocaleString()
+      return formatPrice(originalYearly)
     }
     return undefined
   }
@@ -242,7 +243,7 @@ const PlanSelectionPage: React.FC = () => {
                   <div key={plan.id} className="max-w-sm mx-auto">
                     <PricingCard
                       name={plan.name}
-                      price={formatPrice(plan)}
+                      price={formatPlanPrice(plan)}
                       originalPrice={formatOriginalPrice(plan)}
                       period={getPeriod()}
                       description={plan.description}
@@ -265,7 +266,7 @@ const PlanSelectionPage: React.FC = () => {
                     <div className="w-full max-w-sm">
                       <PricingCard
                         name={plan.name}
-                        price={formatPrice(plan)}
+                        price={formatPlanPrice(plan)}
                         originalPrice={formatOriginalPrice(plan)}
                         period={getPeriod()}
                         description={plan.description}

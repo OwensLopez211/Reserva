@@ -23,6 +23,7 @@ import TeamSetupPage from './pages/onboarding/TeamSetupPage'
 import OrganizationConfigPage from './pages/onboarding/OrganizationConfigPage'
 import PaymentSetupPage from './pages/onboarding/PaymentSetupPage'
 import OnboardingWelcomePage from './pages/onboarding/OnboardingWelcomePage'
+import ServicesSetupPage from './pages/onboarding/ServicesSetupPage'
 
 // Páginas privadas
 import DashboardPage from './pages/dashboard/DashboardPage'
@@ -260,6 +261,11 @@ function App() {
                   <Route path="team" element={
                     <ProtectedRoute>
                       <TeamSetupPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="services" element={
+                    <ProtectedRoute>
+                      <ServicesSetupPage />
                     </ProtectedRoute>
                   } />
                   <Route path="organization" element={
