@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Plus, Trash2, User, Mail, Phone, Users, AlertCircle } from 'lucide-react'
 import { useOnboarding } from '../../contexts/OnboardingContext'
 import { formatPhoneNumber, getPhoneNumbers } from '../../utils/formatters'
+import { OnboardingProgressIndicator } from '../../components/onboarding/OnboardingProgressIndicator'
 
 const TeamSetupPage: React.FC = () => {
   const navigate = useNavigate()
@@ -282,21 +283,12 @@ const TeamSetupPage: React.FC = () => {
               </div>
               <h1 className="text-2xl font-bold text-gray-900">Reserva+</h1>
             </div>
-            <div className="text-sm text-gray-500">
-              Paso 3 de 6
-            </div>
           </div>
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="w-full bg-gray-200 h-2">
-            <div className="w-3/6 bg-gradient-to-r from-emerald-500 to-cyan-500 h-2 transition-all duration-500"></div>
-          </div>
-        </div>
-      </div>
+      {/* Progress Indicator */}
+      <OnboardingProgressIndicator />
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

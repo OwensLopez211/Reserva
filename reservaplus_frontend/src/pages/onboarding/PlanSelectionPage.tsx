@@ -6,6 +6,8 @@ import { Check, Star } from 'lucide-react'
 import PricingCard from '../../components/pricing/PricingCard'
 import { OnboardingService } from '../../services/onboardingService'
 import { formatPrice } from '../../utils/formatters'
+import { useOnboarding } from '../../contexts/OnboardingContext'
+import { OnboardingProgressIndicator } from '../../components/onboarding/OnboardingProgressIndicator'
 
 interface Plan {
   id: string
@@ -24,6 +26,7 @@ interface Plan {
 
 const PlanSelectionPage: React.FC = () => {
   const navigate = useNavigate()
+  const { setCurrentStep, markStepCompleted } = useOnboarding()
   const [selectedBilling, setSelectedBilling] = useState<'monthly' | 'yearly'>('monthly')
   const [plans, setPlans] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
@@ -88,8 +91,11 @@ const PlanSelectionPage: React.FC = () => {
       localStorage.setItem('selected_billing', selectedBilling)
       localStorage.setItem('selected_plan_data', JSON.stringify(selectedPlan))
       
-      // Navegar directamente al registro
-      // El signup se hará en la página de registro con todos los datos
+      // Actualizar el contexto de onboarding
+      markStepCompleted(0) // Marcar paso 0 (selección de plan) como completado
+      setCurrentStep(1) // Avanzar al paso 1 (registro)
+      
+      // Navegar al registro
       navigate('/onboarding/register')
       
     } catch (error) {
@@ -160,21 +166,12 @@ const PlanSelectionPage: React.FC = () => {
               </div>
               <h1 className="text-2xl font-bold text-gray-900">Reserva+</h1>
             </div>
-            <div className="text-sm text-gray-500">
-              Paso 1 de 6
-            </div>
           </div>
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="w-full bg-gray-200 h-2">
-            <div className="w-1/6 bg-gradient-to-r from-emerald-500 to-cyan-500 h-2 transition-all duration-500"></div>
-          </div>
-        </div>
-      </div>
+      {/* Progress Indicator */}
+      <OnboardingProgressIndicator />
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">

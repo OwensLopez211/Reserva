@@ -49,6 +49,7 @@ class OnboardingCompleteView(APIView):
                 user = User.objects.create_user(
                     username=user_data.get('email', registration.email),
                     email=registration.email,
+                    password=user_data.get('password', ''),  # Usar la contraseña del registro
                     first_name=user_data.get('first_name', ''),
                     last_name=user_data.get('last_name', ''),
                     role='owner'

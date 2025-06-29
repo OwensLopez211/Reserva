@@ -4,25 +4,21 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   CheckCircle, 
-  Calendar, 
   Users, 
   Settings, 
   CreditCard, 
   ArrowRight, 
-  Star,
   Rocket,
-  Gift,
-  Clock,
-  Mail,
-  PlayCircle,
-  Sparkles
+  Sparkles,
+  AlertCircle
 } from 'lucide-react'
 import { useOnboarding } from '../../contexts/OnboardingContext'
 import { useAuth } from '../../contexts/AuthContext'
+import { OnboardingProgressIndicator } from '../../components/onboarding/OnboardingProgressIndicator'
 
 const OnboardingCompletePage: React.FC = () => {
   const navigate = useNavigate()
-  const { completeOnboarding, isCompleting, organizationData, professionals, services, planInfo } = useOnboarding()
+  const { completeOnboarding, organizationData, professionals, services, planInfo } = useOnboarding()
   const { checkAuth } = useAuth()
   
   const [isLoading, setIsLoading] = useState(false)
@@ -69,29 +65,29 @@ const OnboardingCompletePage: React.FC = () => {
     }
   ]
 
-  const nextSteps = [
-    {
-      icon: Calendar,
-      title: 'Explora tu Calendario',
-      description: 'Revisa la vista principal donde gestionarás todas las citas',
-      action: 'Ver calendario',
-      color: 'emerald'
-    },
-    {
-      icon: Users,
-      title: 'Invita a tu Equipo',
-      description: 'Envía invitaciones por email a tu equipo para que accedan',
-      action: 'Invitar equipo',
-      color: 'blue'
-    },
-    {
-      icon: PlayCircle,
-      title: 'Tutorial Interactivo',
-      description: 'Aprende lo básico con una guía paso a paso (5 min)',
-      action: 'Comenzar tutorial',
-      color: 'purple'
-    }
-  ]
+  // const nextSteps = [
+  //   {
+  //     icon: Calendar,
+  //     title: 'Explora tu Calendario',
+  //     description: 'Revisa la vista principal donde gestionarás todas las citas',
+  //     action: 'Ver calendario',
+  //     color: 'emerald'
+  //   },
+  //   {
+  //     icon: Users,
+  //     title: 'Invita a tu Equipo',
+  //     description: 'Envía invitaciones por email a tu equipo para que accedan',
+  //     action: 'Invitar equipo',
+  //     color: 'blue'
+  //   },
+  //   {
+  //     icon: PlayCircle,
+  //     title: 'Tutorial Interactivo',
+  //     description: 'Aprende lo básico con una guía paso a paso (5 min)',
+  //     action: 'Comenzar tutorial',
+  //     color: 'purple'
+  //   }
+  // ]
 
   const handleCompleteOnboarding = async () => {
     setIsLoading(true)
@@ -120,10 +116,11 @@ const OnboardingCompletePage: React.FC = () => {
         }
       }, 2000)
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Error completando onboarding:', error)
       setCompletionStep('error')
-      setError(error.message || 'Error al completar el onboarding')
+      const errorMessage = error instanceof Error ? error.message : 'Error al completar el onboarding'
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -387,14 +384,8 @@ const OnboardingCompletePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Progress Bar - Completo */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="w-full bg-gray-200 h-2">
-            <div className="w-full bg-gradient-to-r from-emerald-500 to-cyan-500 h-2 transition-all duration-1000"></div>
-          </div>
-        </div>
-      </div>
+      {/* Progress Indicator */}
+      <OnboardingProgressIndicator />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {completionStep === 'summary' && renderSummaryStep()}

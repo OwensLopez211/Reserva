@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Clock, Calendar, Bell, Settings, CheckCircle, AlertCircle } from 'lucide-react'
+import { useOnboarding } from '../../contexts/OnboardingContext'
+import { OnboardingProgressIndicator } from '../../components/onboarding/OnboardingProgressIndicator'
 
 interface BusinessHours {
   [key: string]: { open: string; close: string; is_open: boolean }
@@ -40,6 +42,7 @@ interface OrganizationConfig {
 
 const OrganizationConfigPage: React.FC = () => {
   const navigate = useNavigate()
+  const { registrationToken, organizationData, setCurrentStep: setOnboardingStep, markStepCompleted } = useOnboarding()
   const [isLoading, setIsLoading] = useState(false)
   const [, setSelectedIndustry] = useState<string>('')
   const [errors, setErrors] = useState<{[key: string]: string}>({})
@@ -47,15 +50,27 @@ const OrganizationConfigPage: React.FC = () => {
 
   // Cargar datos guardados del onboarding
   useEffect(() => {
-    const registrationData = localStorage.getItem('registrationData')
-    if (registrationData) {
-      const data = JSON.parse(registrationData)
-      setSelectedIndustry(data.industryTemplate)
-      setConfig(getIndustryTemplate(data.industryTemplate))
-    } else {
-      navigate('/onboarding/register')
+    if (!registrationToken) {
+      navigate('/onboarding/plan')
+      return
     }
-  }, [navigate])
+
+    // Usar datos del contexto de onboarding
+    if (organizationData.industry_template) {
+      setSelectedIndustry(organizationData.industry_template)
+      setConfig(getIndustryTemplate(organizationData.industry_template))
+    } else {
+      // Fallback a localStorage si no hay datos en contexto
+      const registrationData = localStorage.getItem('registrationData')
+      if (registrationData) {
+        const data = JSON.parse(registrationData)
+        setSelectedIndustry(data.industryTemplate)
+        setConfig(getIndustryTemplate(data.industryTemplate))
+      } else {
+        navigate('/onboarding/register')
+      }
+    }
+  }, [navigate, registrationToken, organizationData])
 
   const [config, setConfig] = useState<OrganizationConfig>({
     business_hours: {
@@ -232,7 +247,11 @@ const OrganizationConfigPage: React.FC = () => {
         organizationConfig: config
       }))
 
-      navigate('/onboarding/payment')
+      // Actualizar el contexto de onboarding
+      markStepCompleted(4) // Marcar paso 4 (organización) como completado
+      setOnboardingStep(5) // Avanzar al paso 5 (complete/welcome)
+
+      navigate('/onboarding/complete')
     } catch (error) {
       console.error('Error al guardar configuración:', error)
     } finally {
@@ -604,21 +623,12 @@ const OrganizationConfigPage: React.FC = () => {
               </div>
               <h1 className="text-2xl font-bold text-gray-900">Reserva+</h1>
             </div>
-            <div className="text-sm text-gray-500">
-              Paso 4 de 6
-            </div>
           </div>
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="w-full bg-gray-200 h-2">
-            <div className="w-4/6 bg-gradient-to-r from-emerald-500 to-cyan-500 h-2 transition-all duration-500"></div>
-          </div>
-        </div>
-      </div>
+      {/* Progress Indicator */}
+      <OnboardingProgressIndicator />
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

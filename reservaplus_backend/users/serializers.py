@@ -28,9 +28,9 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'first_name', 'last_name', 
             'full_name', 'phone', 'role', 'is_professional', 
             'organization', 'organization_name', 'is_active_in_org',
-            'date_joined', 'created_at', 'updated_at'
+            'date_joined', 'last_login', 'last_login_local', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'date_joined', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'date_joined', 'last_login', 'last_login_local', 'created_at', 'updated_at']
     
     def to_representation(self, instance):
         """

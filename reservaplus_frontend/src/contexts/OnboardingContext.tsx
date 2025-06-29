@@ -1,4 +1,4 @@
-// src/contexts/OnboardingContext.tsx - SIN LOOPS INFINITOS
+// src/contexts/OnboardingContext.tsx - VERSIÓN CON PERSISTENCIA COMPLETA
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'
 import { OnboardingService } from '../services/onboardingService'
@@ -48,13 +48,14 @@ interface OnboardingContextType {
   
   // Información del registro
   registrationToken: string | null
-  planInfo: any
+  planInfo: { id: string; name: string; price_monthly: number } | null
   
   // Métodos de navegación
   setCurrentStep: (step: number) => void
   nextStep: () => void
   prevStep: () => void
   markStepCompleted: (step: number) => void
+  navigateToCurrentStep: () => string // Nuevo método para obtener la URL del paso actual
   
   // Métodos de datos
   updateOrganizationData: (data: Partial<OrganizationData>) => void
@@ -90,7 +91,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   
   // Token de registro
   const [registrationToken, setRegistrationToken] = useState<string | null>(null)
-  const [planInfo, setPlanInfo] = useState<any>(null)
+  const [planInfo, setPlanInfo] = useState<{ id: string; name: string; price_monthly: number } | null>(null)
   
   // Datos del onboarding
   const [organizationData, setOrganizationData] = useState<OrganizationData>({
@@ -112,23 +113,76 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   // Configuración de pasos
   const totalSteps = 6
   
+  // Mapeo de pasos a URLs
+  const stepToUrlMap = {
+    0: '/onboarding/plan',
+    1: '/onboarding/register', 
+    2: '/onboarding/team',
+    3: '/onboarding/services',
+    4: '/onboarding/complete',
+    5: '/onboarding/welcome'
+  }
+  
   // Colores predefinidos para profesionales
   const professionalColors = [
     '#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336',
     '#795548', '#607D8B', '#E91E63', '#00BCD4', '#CDDC39'
   ]
 
-  // Guardar progreso en localStorage - usando useCallback para evitar recreación
+  // Clave para localStorage
+  const STORAGE_KEY = 'onboarding_progress'
+
+  // Guardar progreso en localStorage - mejorado
   const saveProgress = useCallback(() => {
+    if (!initialized) return // No guardar hasta que esté inicializado
+    
     const progressData = {
       currentStep,
       completedSteps,
       organizationData,
       professionals,
-      services
+      services,
+      registrationToken,
+      planInfo,
+      timestamp: Date.now() // Para detectar datos obsoletos
     }
-    localStorage.setItem('onboarding_progress', JSON.stringify(progressData))
-  }, [currentStep, completedSteps, organizationData, professionals, services])
+    
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(progressData))
+      console.log('💾 Progreso guardado:', { currentStep, completedSteps: completedSteps.length })
+    } catch (error) {
+      console.error('Error guardando progreso:', error)
+    }
+  }, [currentStep, completedSteps, organizationData, professionals, services, registrationToken, planInfo, initialized])
+
+  // Cargar progreso desde localStorage
+  const loadProgress = useCallback(() => {
+    try {
+      const savedData = localStorage.getItem(STORAGE_KEY)
+      if (!savedData) return null
+      
+      const parsed = JSON.parse(savedData)
+      
+      // Verificar que los datos no sean muy antiguos (7 días)
+      const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000)
+      if (parsed.timestamp && parsed.timestamp < sevenDaysAgo) {
+        console.log('🕐 Datos de onboarding obsoletos, limpiando...')
+        localStorage.removeItem(STORAGE_KEY)
+        return null
+      }
+      
+      return parsed
+    } catch (error) {
+      console.error('Error cargando progreso:', error)
+      localStorage.removeItem(STORAGE_KEY)
+      return null
+    }
+  }, [])
+
+  // Obtener URL del paso actual
+  const navigateToCurrentStep = useCallback((): string => {
+    return stepToUrlMap[currentStep as keyof typeof stepToUrlMap] || '/onboarding/plan'
+  }, [currentStep])
 
   // Inicializar desde token de registro - usando useCallback
   const initializeFromToken = useCallback(async (token: string): Promise<boolean> => {
@@ -139,20 +193,16 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         setRegistrationToken(token)
         setPlanInfo(status.selected_plan)
         
-        // Cargar datos guardados si existen
-        const savedData = localStorage.getItem('onboarding_progress')
-        if (savedData) {
-          try {
-            const parsed = JSON.parse(savedData)
-            
-            if (parsed.organizationData) setOrganizationData(parsed.organizationData)
-            if (parsed.professionals) setProfessionals(parsed.professionals)
-            if (parsed.services) setServices(parsed.services)
-            if (parsed.currentStep !== undefined) setCurrentStep(parsed.currentStep)
-            if (parsed.completedSteps) setCompletedSteps(parsed.completedSteps)
-          } catch (e) {
-            console.error('Error parsing saved progress:', e)
-          }
+        // Cargar progreso guardado si existe
+        const savedProgress = loadProgress()
+        if (savedProgress) {
+          console.log('📂 Cargando progreso guardado:', savedProgress.currentStep)
+          
+          if (savedProgress.organizationData) setOrganizationData(savedProgress.organizationData)
+          if (savedProgress.professionals) setProfessionals(savedProgress.professionals)
+          if (savedProgress.services) setServices(savedProgress.services)
+          if (savedProgress.currentStep !== undefined) setCurrentStep(savedProgress.currentStep)
+          if (savedProgress.completedSteps) setCompletedSteps(savedProgress.completedSteps)
         }
         
         setInitialized(true)
@@ -168,7 +218,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       setInitialized(true)
       return false
     }
-  }, [])
+  }, [loadProgress])
 
   // Inicializar desde localStorage al cargar - SOLO UNA VEZ
   useEffect(() => {
@@ -177,10 +227,27 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       if (token) {
         initializeFromToken(token)
       } else {
-        setInitialized(true)
+        // Si no hay token, intentar cargar progreso local de todas formas
+        const savedProgress = loadProgress()
+        if (savedProgress && savedProgress.registrationToken) {
+          initializeFromToken(savedProgress.registrationToken)
+        } else {
+          setInitialized(true)
+        }
       }
     }
-  }, [initialized, initializeFromToken])
+  }, [initialized, initializeFromToken, loadProgress])
+
+  // Auto-guardar cuando cambian los datos importantes
+  useEffect(() => {
+    if (initialized) {
+      const timeoutId = setTimeout(() => {
+        saveProgress()
+      }, 500) // Debounce de 500ms
+      
+      return () => clearTimeout(timeoutId)
+    }
+  }, [initialized, currentStep, completedSteps, organizationData, professionals, services, saveProgress])
 
   // Validación usando useCallback para evitar recreación constante
   const canProceedFromStep = useCallback((step: number): boolean => {
@@ -228,22 +295,14 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       const newStep = currentStep + 1
       setCurrentStep(newStep)
       setCompletedSteps(newCompletedSteps)
-      
-      // Guardar después de actualizar el estado
-      setTimeout(() => {
-        saveProgress()
-      }, 100)
     }
-  }, [currentStep, totalSteps, canProceedFromStep, completedSteps, saveProgress])
+  }, [currentStep, totalSteps, canProceedFromStep, completedSteps])
 
   const prevStep = useCallback(() => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1)
-      setTimeout(() => {
-        saveProgress()
-      }, 100)
     }
-  }, [currentStep, saveProgress])
+  }, [currentStep])
 
   const markStepCompleted = useCallback((step: number) => {
     setCompletedSteps(prev => {
@@ -360,13 +419,14 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         }))
       }
 
-      const result = await OnboardingService.completeOnboarding(onboardingData)
+      await OnboardingService.completeOnboarding(onboardingData)
       
-      // Limpiar datos temporales
+      // Limpiar datos temporales y progreso guardado
       OnboardingService.clearOnboardingData()
-      markStepCompleted(currentStep)
+      localStorage.removeItem(STORAGE_KEY)
+      console.log('🗑️ Progreso limpiado después de completar onboarding')
       
-      return result
+      markStepCompleted(currentStep)
     } catch (error) {
       console.error('Error completando onboarding:', error)
       throw error
@@ -395,6 +455,8 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     setServices([])
     setInitialized(false)
     OnboardingService.clearOnboardingData()
+    localStorage.removeItem(STORAGE_KEY)
+    console.log('🔄 Onboarding reseteado completamente')
   }, [])
 
   const value: OnboardingContextType = {
@@ -415,6 +477,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     nextStep,
     prevStep,
     markStepCompleted,
+    navigateToCurrentStep,
     
     // Métodos de datos
     updateOrganizationData,

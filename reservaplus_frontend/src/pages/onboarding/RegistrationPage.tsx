@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, Eye, EyeOff, Check, AlertCircle, User, Building,
 import { OnboardingService } from '../../services/onboardingService'
 import { useOnboarding } from '../../contexts/OnboardingContext'
 import { formatPriceWithPeriod, formatPhoneNumber, getPhoneNumbers } from '../../utils/formatters'
+import { OnboardingProgressIndicator } from '../../components/onboarding/OnboardingProgressIndicator'
 
 interface RegistrationData {
   // Datos del usuario admin
@@ -52,7 +53,7 @@ type Plan = {
 
 const RegistrationPage: React.FC = () => {
   const navigate = useNavigate()
-  const { initializeFromToken } = useOnboarding()
+  const { initializeFromToken, setCurrentStep, markStepCompleted } = useOnboarding()
   
   const [formData, setFormData] = useState<RegistrationData>({
     firstName: '',
@@ -255,7 +256,8 @@ const RegistrationPage: React.FC = () => {
           email: formData.email,
           first_name: formData.firstName,
           last_name: formData.lastName,
-          organization_name: formData.organizationName
+          organization_name: formData.organizationName,
+          password: formData.password
         }
       )
 
@@ -282,6 +284,10 @@ const RegistrationPage: React.FC = () => {
           }
         }
         localStorage.setItem('registration_form_data', JSON.stringify(additionalData))
+
+        // Actualizar el contexto de onboarding
+        markStepCompleted(1) // Marcar paso 1 (registro) como completado
+        setCurrentStep(2) // Avanzar al paso 2 (team)
 
         // Navegar al siguiente paso
         navigate('/onboarding/team')
@@ -329,21 +335,12 @@ const RegistrationPage: React.FC = () => {
               </div>
               <h1 className="text-2xl font-bold text-gray-900">Reserva+</h1>
             </div>
-            <div className="text-sm text-gray-500">
-              Paso 2 de 6
-            </div>
           </div>
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="w-full bg-gray-200 h-2">
-            <div className="w-2/6 bg-gradient-to-r from-emerald-500 to-cyan-500 h-2 transition-all duration-500"></div>
-          </div>
-        </div>
-      </div>
+      {/* Progress Indicator */}
+      <OnboardingProgressIndicator />
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

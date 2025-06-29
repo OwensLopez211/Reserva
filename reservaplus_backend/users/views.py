@@ -1,6 +1,8 @@
 # users/views.py - LOGOUT CORREGIDO
 
 from django.contrib.auth import authenticate
+from django.utils import timezone
+import pytz
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -9,6 +11,16 @@ from rest_framework.views import APIView
 from core.authentication import generate_access_token, generate_refresh_token, verify_refresh_token
 from .models import User
 from .serializers import UserSerializer, LoginSerializer, UserCreateSerializer
+
+
+def get_chile_local_time():
+    """
+    Obtiene la hora actual en zona horaria de Chile como string formateado
+    """
+    chile_tz = pytz.timezone('America/Santiago')
+    utc_now = timezone.now()
+    chile_now = utc_now.astimezone(chile_tz)
+    return chile_now.strftime('%Y-%m-%d %H:%M:%S')
 
 
 class LoginView(APIView):
@@ -25,11 +37,18 @@ class LoginView(APIView):
             
             user = authenticate(request, username=username, password=password)
             if user:
+                # ACTUALIZAR LAST_LOGIN - Django maneja el estándar, nosotros el local
+                user.last_login = timezone.now()  # Django estándar (UTC)
+                user.last_login_local = get_chile_local_time()  # Nuestro campo local
+                user.save(update_fields=['last_login', 'last_login_local'])
+                
                 # Generar tokens JWT
                 access_token = generate_access_token(user)
                 refresh_token = generate_refresh_token(user)
                 
                 print(f"Login exitoso para {user.username}")
+                print(f"Last login UTC: {user.last_login}")
+                print(f"Last login Chile: {user.last_login_local}")
                 print(f"Access token generado: {access_token[:50]}...")
                 
                 return Response({
@@ -63,7 +82,16 @@ class RefreshTokenView(APIView):
         
         user = verify_refresh_token(refresh_token)
         if user:
+            # ACTUALIZAR LAST_LOGIN también al renovar token
+            user.last_login = timezone.now()  # Django estándar (UTC)
+            user.last_login_local = get_chile_local_time()  # Nuestro campo local
+            user.save(update_fields=['last_login', 'last_login_local'])
+            
             new_access_token = generate_access_token(user)
+            print(f"Token renovado para {user.username}")
+            print(f"Last login UTC: {user.last_login}")
+            print(f"Last login Chile: {user.last_login_local}")
+            
             return Response({
                 'access_token': new_access_token,
                 'token_type': 'Bearer'

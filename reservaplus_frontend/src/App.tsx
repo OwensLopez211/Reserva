@@ -5,6 +5,7 @@ import { OnboardingProvider } from './contexts/OnboardingContext'
 import { TransitionProvider } from './contexts/TransitionContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import { OnboardingGuard } from './components/onboarding/OnboardingGuard'
+import { OnboardingNavigator } from './components/onboarding/OnboardingNavigator'
 import PublicLayout from './components/layouts/PublicLayout'
 import PrivateLayout from './components/layouts/PrivateLayout'
 
@@ -21,7 +22,6 @@ import PlanSelectionPage from './pages/onboarding/PlanSelectionPage'
 import RegistrationPage from './pages/onboarding/RegistrationPage'
 import TeamSetupPage from './pages/onboarding/TeamSetupPage'
 import OrganizationConfigPage from './pages/onboarding/OrganizationConfigPage'
-import PaymentSetupPage from './pages/onboarding/PaymentSetupPage'
 import OnboardingWelcomePage from './pages/onboarding/OnboardingWelcomePage'
 import ServicesSetupPage from './pages/onboarding/ServicesSetupPage'
 
@@ -254,7 +254,7 @@ function App() {
                 <Route path="/login" element={<LoginLayout />} />
 
                 {/* RUTAS DE ONBOARDING - PÚBLICAS (sin autenticación requerida) */}
-                <Route path="/onboarding">
+                <Route path="/onboarding" element={<OnboardingNavigator />}>
                   <Route path="plan" element={<PlanSelectionPage />} />
                   <Route path="register" element={<RegistrationPage />} />
                   {/* Las siguientes requieren estar registrado */}
@@ -273,18 +273,13 @@ function App() {
                       <OrganizationConfigPage />
                     </ProtectedRoute>
                   } />
-                  <Route path="payment" element={
-                    <ProtectedRoute>
-                      <PaymentSetupPage />
-                    </ProtectedRoute>
-                  } />
                   <Route path="welcome" element={
                     <ProtectedRoute>
                       <OnboardingWelcomePage />
                     </ProtectedRoute>
                   } />
-                  {/* Ruta por defecto del onboarding */}
-                  <Route index element={<Navigate to="/onboarding/plan" replace />} />
+                  {/* Ruta por defecto del onboarding - manejada por OnboardingNavigator */}
+                  <Route index element={<div />} />
                 </Route>
 
                 {/* Rutas privadas - requieren autenticación Y onboarding completo */}

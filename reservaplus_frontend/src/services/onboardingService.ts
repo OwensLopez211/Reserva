@@ -75,6 +75,7 @@ export interface SignupData {
     first_name: string
     last_name: string
     organization_name?: string
+    password: string
   }
 }
 
@@ -100,6 +101,7 @@ export class OnboardingService {
     first_name: string
     last_name: string
     organization_name: string
+    password: string
   }): Promise<SignupResponse> {
     try {
       const signupData = {
@@ -108,7 +110,8 @@ export class OnboardingService {
         user_data: {
           first_name: userData.first_name,
           last_name: userData.last_name,
-          organization_name: userData.organization_name
+          organization_name: userData.organization_name,
+          password: userData.password
         }
       }
 

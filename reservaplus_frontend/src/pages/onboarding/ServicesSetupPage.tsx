@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Plus, Trash2, Clock, DollarSign, Tag, AlertCircle, Lightbulb } from 'lucide-react'
 import { useOnboarding } from '../../contexts/OnboardingContext'
 import { formatPriceWithSymbol, formatPriceInput, getPriceNumber } from '../../utils/formatters'
+import { OnboardingProgressIndicator } from '../../components/onboarding/OnboardingProgressIndicator'
 
 const ServicesSetupPage: React.FC = () => {
   const navigate = useNavigate()
@@ -214,21 +215,12 @@ const ServicesSetupPage: React.FC = () => {
               </div>
               <h1 className="text-2xl font-bold text-gray-900">Reserva+</h1>
             </div>
-            <div className="text-sm text-gray-500">
-              Último Paso - Finalizando
-            </div>
           </div>
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="w-full bg-gray-200 h-2">
-            <div className="w-4/6 bg-gradient-to-r from-emerald-500 to-cyan-500 h-2 transition-all duration-500"></div>
-          </div>
-        </div>
-      </div>
+      {/* Progress Indicator */}
+      <OnboardingProgressIndicator />
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

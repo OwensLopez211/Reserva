@@ -37,6 +37,9 @@ class User(AbstractUser):
     is_professional = models.BooleanField(default=False)
     is_active_in_org = models.BooleanField(default=True)
     
+    # Campo para almacenar last_login en hora local de Chile (como string)
+    last_login_local = models.CharField(max_length=50, null=True, blank=True, help_text="Último login en hora local de Chile")
+    
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
