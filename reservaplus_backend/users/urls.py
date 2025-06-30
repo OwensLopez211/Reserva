@@ -14,6 +14,13 @@ urlpatterns = [
     path('logout/', views.LogoutView.as_view(), name='logout'),
     path('me/', views.CurrentUserView.as_view(), name='current-user'),
     
-    # CRUD de usuarios
+    # Gestión de usuarios de la organización (con limitaciones de plan)
+    path('organization/', views.OrganizationUserListView.as_view(), name='organization-users-list'),
+    path('organization/create/', views.OrganizationUserCreateView.as_view(), name='organization-user-create'),
+    path('organization/<uuid:id>/', views.OrganizationUserDetailView.as_view(), name='organization-user-detail'),
+    path('organization/<uuid:user_id>/toggle-status/', views.UserToggleStatusView.as_view(), name='user-toggle-status'),
+    path('roles/', views.UserRolesView.as_view(), name='user-roles'),
+    
+    # CRUD de usuarios (ViewSet existente)
     path('', include(router.urls)),
 ]

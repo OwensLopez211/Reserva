@@ -31,9 +31,12 @@ class OnboardingCompleteView(APIView):
             "services": [...]
         }
         """
+        print(f"🔍 Recibidos datos de onboarding: {request.data}")
+        
         serializer = OnboardingDataSerializer(data=request.data)
         
         if not serializer.is_valid():
+            print(f"❌ Errores de validación: {serializer.errors}")
             return Response({
                 'error': 'Datos inválidos',
                 'details': serializer.errors
@@ -43,9 +46,12 @@ class OnboardingCompleteView(APIView):
             with transaction.atomic():
                 # Obtener registro temporal validado
                 registration = serializer.context['registration']
+                print(f"✅ Token válido, registro encontrado: {registration.email}")
                 
                 # 1. Crear usuario principal (owner de la organización)
                 user_data = registration.registration_data
+                print(f"📝 Datos del usuario owner: {user_data}")
+                
                 user = User.objects.create_user(
                     username=user_data.get('email', registration.email),
                     email=registration.email,
@@ -54,9 +60,12 @@ class OnboardingCompleteView(APIView):
                     last_name=user_data.get('last_name', ''),
                     role='owner'
                 )
+                print(f"👤 Usuario owner creado: {user.email} (ID: {user.id})")
                 
                 # 2. Crear organización
                 org_data = serializer.validated_data['organization']
+                print(f"🏢 Datos de la organización: {org_data}")
+                
                 organization = Organization.objects.create(
                     name=org_data['name'],
                     industry_template=org_data['industry_template'],
@@ -67,10 +76,12 @@ class OnboardingCompleteView(APIView):
                     country=org_data.get('country', 'Chile'),
                     settings=self._get_industry_settings(org_data['industry_template'])
                 )
+                print(f"🏢 Organización creada: {organization.name} (ID: {organization.id})")
                 
                 # Asignar usuario a organización
                 user.organization = organization
                 user.save()
+                print(f"🔗 Usuario asignado a organización")
                 
                 # 3. Crear suscripción
                 subscription = OrganizationSubscription.objects.create(
@@ -83,29 +94,68 @@ class OnboardingCompleteView(APIView):
                     current_period_end=timezone.now() + timedelta(days=14),
                 )
                 
-                # 4. Crear profesionales
-                professionals_data = serializer.validated_data['professionals']
+                # 4. Crear miembros del equipo (usuarios)
+                team_members_data = serializer.validated_data['professionals']
+                print(f"👥 Datos del equipo: {team_members_data}")
+                created_users = []
                 created_professionals = []
                 
-                for prof_data in professionals_data:
-                    professional = Professional.objects.create(
+                for i, member_data in enumerate(team_members_data):
+                    print(f"👤 Procesando miembro {i+1}: {member_data}")
+                    # Crear usuario del sistema con el rol específico
+                    member_role = member_data.get('role', 'staff')  # Rol por defecto
+                    
+                    # Verificar si el usuario ya existe
+                    if User.objects.filter(email=member_data['email']).exists():
+                        print(f"⚠️ Usuario con email {member_data['email']} ya existe, saltando...")
+                        continue
+                    
+                    team_user = User.objects.create_user(
+                        username=member_data['email'],  # Usar email como username
+                        email=member_data['email'],
+                        first_name=member_data['name'].split()[0] if member_data['name'] else '',
+                        last_name=' '.join(member_data['name'].split()[1:]) if len(member_data['name'].split()) > 1 else '',
+                        role=member_role,
                         organization=organization,
-                        name=prof_data['name'],
-                        email=prof_data['email'],
-                        phone=prof_data.get('phone', ''),
-                        specialty=prof_data.get('specialty', ''),
-                        color_code=prof_data.get('color_code', '#4CAF50'),
-                        is_active=prof_data.get('is_active', True),
-                        accepts_walk_ins=prof_data.get('accepts_walk_ins', True)
+                        phone=member_data.get('phone', ''),
+                        is_professional=member_data.get('is_professional', member_role == 'professional'),
+                        is_active_in_org=True
                     )
-                    created_professionals.append(professional)
-                    subscription.increment_professionals_count()
+                    created_users.append(team_user)
+                    print(f"✅ Usuario creado: {team_user.email} con rol {member_role}")
+                    
+                    # Incrementar contadores específicos por rol
+                    subscription.increment_users_count()
+                    if member_role == 'professional':
+                        subscription.increment_professionals_count()
+                    elif member_role == 'reception':
+                        subscription.increment_receptionists_count()
+                    elif member_role == 'staff':
+                        subscription.increment_staff_count()
+                    
+                    # Crear perfil Professional solo si es necesario para el sistema de citas
+                    # (para profesionales y algunos staff que pueden dar servicios)
+                    if member_role in ['professional', 'staff'] or member_data.get('is_professional', False):
+                        professional = Professional.objects.create(
+                            organization=organization,
+                            user=team_user,
+                            name=member_data['name'],
+                            email=member_data['email'],
+                            phone=member_data.get('phone', ''),
+                            specialty=member_data.get('specialty', ''),
+                            color_code=member_data.get('color_code', '#4CAF50'),
+                            is_active=member_data.get('is_active', True),
+                            accepts_walk_ins=member_data.get('accepts_walk_ins', True)
+                        )
+                        created_professionals.append(professional)
                 
                 # 5. Crear servicios
                 services_data = serializer.validated_data['services']
+                print(f"🛠️ Datos de servicios: {services_data}")
                 created_services = []
                 
-                for serv_data in services_data:
+                for i, serv_data in enumerate(services_data):
+                    print(f"🛠️ Procesando servicio {i+1}: {serv_data}")
                     service = Service.objects.create(
                         organization=organization,
                         name=serv_data['name'],
@@ -128,6 +178,8 @@ class OnboardingCompleteView(APIView):
                 organization.complete_onboarding()
                 registration.mark_completed(user)
                 
+                print(f"🎉 Onboarding completado exitosamente para {organization.name}")
+                
                 return Response({
                     'message': 'Onboarding completado exitosamente',
                     'data': {
@@ -146,6 +198,14 @@ class OnboardingCompleteView(APIView):
                             'status': subscription.status,
                             'trial_end': subscription.trial_end
                         },
+                        'team_members': [
+                            {
+                                'id': str(u.id),
+                                'name': u.full_name,
+                                'email': u.email,
+                                'role': u.role
+                            } for u in created_users
+                        ],
                         'professionals': [
                             {
                                 'id': str(p.id),
@@ -165,6 +225,9 @@ class OnboardingCompleteView(APIView):
                 }, status=status.HTTP_201_CREATED)
                 
         except Exception as e:
+            print(f"💥 Error grave en onboarding: {str(e)}")
+            import traceback
+            print(f"📋 Traceback completo: {traceback.format_exc()}")
             return Response({
                 'error': f'Error al completar onboarding: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

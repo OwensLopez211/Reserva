@@ -11,7 +11,7 @@ const LoginPage: React.FC = () => {
 
   // Redirigir si ya está autenticado
   if (isAuthenticated) {
-    const from = location.state?.from?.pathname || '/dashboard'
+    const from = location.state?.from?.pathname || '/app/dashboard'
     return <Navigate to={from} replace />
   }
 
@@ -27,12 +27,7 @@ const LoginPage: React.FC = () => {
   }
 
   const handleLogin = async (username: string, password: string) => {
-    try {
-      await login(username, password)
-    } catch (error) {
-      // El error se maneja en el componente LoginForm
-      throw error
-    }
+    await login(username, password)
   }
 
   return (

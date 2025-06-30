@@ -53,7 +53,7 @@ type Plan = {
 
 const RegistrationPage: React.FC = () => {
   const navigate = useNavigate()
-  const { initializeFromToken, setCurrentStep, markStepCompleted } = useOnboarding()
+  const { initializeFromToken, setCurrentStep, markStepCompleted, updateOrganizationData } = useOnboarding()
   
   const [formData, setFormData] = useState<RegistrationData>({
     firstName: '',
@@ -267,6 +267,17 @@ const RegistrationPage: React.FC = () => {
       const tokenValid = await initializeFromToken(signupResponse.registration_token)
       
       if (tokenValid) {
+        // Actualizar el contexto de onboarding con los datos de la organización
+        updateOrganizationData({
+          name: formData.organizationName,
+          industry_template: formData.industryTemplate,
+          email: formData.businessEmail,
+          phone: getPhoneNumbers(formData.businessPhone),
+          address: formData.address || '',
+          city: formData.city || '',
+          country: formData.country || 'Chile'
+        })
+
         // Guardar datos adicionales del formulario para usar en pasos posteriores
         const additionalData = {
           formData: {
@@ -284,6 +295,13 @@ const RegistrationPage: React.FC = () => {
           }
         }
         localStorage.setItem('registration_form_data', JSON.stringify(additionalData))
+
+        console.log('✅ Datos de organización actualizados en el contexto:', {
+          name: formData.organizationName,
+          industry_template: formData.industryTemplate,
+          email: formData.businessEmail,
+          phone: getPhoneNumbers(formData.businessPhone)
+        })
 
         // Actualizar el contexto de onboarding
         markStepCompleted(1) // Marcar paso 1 (registro) como completado

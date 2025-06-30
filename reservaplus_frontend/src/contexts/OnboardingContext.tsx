@@ -14,6 +14,17 @@ interface OrganizationData {
   country: string
 }
 
+interface TeamMemberData {
+  name: string
+  email: string
+  phone: string
+  role: 'owner' | 'professional' | 'reception' | 'staff'
+  specialty?: string
+  is_professional: boolean
+  color_code: string
+  accepts_walk_ins: boolean
+}
+
 interface ProfessionalData {
   name: string
   email: string
@@ -111,7 +122,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   const [initialized, setInitialized] = useState(false)
 
   // Configuración de pasos
-  const totalSteps = 6
+  const totalSteps = 5
   
   // Mapeo de pasos a URLs
   const stepToUrlMap = {
@@ -119,8 +130,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     1: '/onboarding/register', 
     2: '/onboarding/team',
     3: '/onboarding/services',
-    4: '/onboarding/complete',
-    5: '/onboarding/welcome'
+    4: '/onboarding/complete'
   }
   
   // Colores predefinidos para profesionales
@@ -191,7 +201,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       
       if (status.is_valid) {
         setRegistrationToken(token)
-        setPlanInfo(status.selected_plan)
+        setPlanInfo(status.selected_plan || null)
         
         // Cargar progreso guardado si existe
         const savedProgress = loadProgress()
@@ -203,6 +213,29 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
           if (savedProgress.services) setServices(savedProgress.services)
           if (savedProgress.currentStep !== undefined) setCurrentStep(savedProgress.currentStep)
           if (savedProgress.completedSteps) setCompletedSteps(savedProgress.completedSteps)
+        }
+        
+        // También cargar datos de la organización desde el registro si no están en el progreso
+        const registrationData = localStorage.getItem('registration_form_data')
+        if (registrationData && (!savedProgress?.organizationData?.name)) {
+          try {
+            const regData = JSON.parse(registrationData)
+            console.log('📋 Cargando datos de organización del registro:', regData)
+            
+            if (regData.formData?.organizationName) {
+              setOrganizationData({
+                name: regData.formData.organizationName,
+                industry_template: regData.industryTemplate || 'salon',
+                email: regData.businessInfo?.email || regData.formData?.businessEmail || '',
+                phone: regData.businessInfo?.phone || regData.formData?.businessPhone || '',
+                address: regData.businessInfo?.address || regData.formData?.address || '',
+                city: regData.businessInfo?.city || regData.formData?.city || '',
+                country: regData.businessInfo?.country || regData.formData?.country || 'Chile'
+              })
+            }
+          } catch (error) {
+            console.error('Error cargando datos de registro:', error)
+          }
         }
         
         setInitialized(true)
@@ -232,6 +265,28 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         if (savedProgress && savedProgress.registrationToken) {
           initializeFromToken(savedProgress.registrationToken)
         } else {
+          // Cargar datos de organización desde el registro si están disponibles
+          const registrationData = localStorage.getItem('registration_form_data')
+          if (registrationData) {
+            try {
+              const regData = JSON.parse(registrationData)
+              console.log('📋 Cargando datos de organización del registro (sin token):', regData)
+              
+              if (regData.formData?.organizationName) {
+                setOrganizationData({
+                  name: regData.formData.organizationName,
+                  industry_template: regData.industryTemplate || 'salon',
+                  email: regData.businessInfo?.email || regData.formData?.businessEmail || '',
+                  phone: regData.businessInfo?.phone || regData.formData?.businessPhone || '',
+                  address: regData.businessInfo?.address || regData.formData?.address || '',
+                  city: regData.businessInfo?.city || regData.formData?.city || '',
+                  country: regData.businessInfo?.country || regData.formData?.country || 'Chile'
+                })
+              }
+            } catch (error) {
+              console.error('Error cargando datos de registro (sin token):', error)
+            }
+          }
           setInitialized(true)
         }
       }
@@ -274,9 +329,6 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
                services.every(s => s.name?.trim() && s.price > 0 && s.duration_minutes > 0)
                
       case 4: // Complete
-        return true
-        
-      case 5: // Welcome
         return true
         
       default:
@@ -395,16 +447,60 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
 
     setIsCompleting(true)
     try {
+      // Cargar datos del equipo desde localStorage
+      const teamSetupData = localStorage.getItem('team_setup_data')
+      let teamMembers: TeamMemberData[] = []
+      
+      console.log('📂 Datos raw de localStorage team_setup_data:', teamSetupData)
+      
+      if (teamSetupData) {
+        const parsedTeamData = JSON.parse(teamSetupData)
+        console.log('📋 Datos parseados del equipo:', parsedTeamData)
+        teamMembers = parsedTeamData.teamMembers || []
+      } else {
+        console.warn('⚠️ No se encontraron datos del equipo en localStorage')
+      }
+
+      console.log('👥 TeamMembers encontrados:', teamMembers)
+
+      // Filtrar solo los miembros que NO son owner (ya que el owner se crea automáticamente en el backend)
+      const professionalMembers = teamMembers.filter((member: TeamMemberData) => member.role !== 'owner')
+      console.log('👨‍💼 Professional members (sin owner):', professionalMembers)
+
+      // Validar datos básicos antes de enviar
+      if (!organizationData.name) {
+        throw new Error('Falta el nombre de la organización')
+      }
+      if (!organizationData.email) {
+        throw new Error('Falta el email de la organización')
+      }
+      if (!organizationData.phone) {
+        throw new Error('Falta el teléfono de la organización')
+      }
+      if (services.length === 0) {
+        throw new Error('Debe agregar al menos un servicio')
+      }
+
       const onboardingData = {
         registration_token: registrationToken,
-        organization: organizationData,
-        professionals: professionals.map(prof => ({
-          name: prof.name,
-          email: prof.email,
-          phone: prof.phone || '',
-          specialty: prof.specialty || '',
-          color_code: prof.color_code,
-          accepts_walk_ins: prof.accepts_walk_ins
+        organization: {
+          name: organizationData.name,
+          industry_template: organizationData.industry_template,
+          email: organizationData.email,
+          phone: organizationData.phone,
+          address: organizationData.address || '',
+          city: organizationData.city || '',
+          country: organizationData.country || 'Chile'
+        },
+        professionals: professionalMembers.map((member: TeamMemberData) => ({
+          name: member.name,
+          email: member.email,
+          phone: member.phone || '',
+          role: member.role, // Incluir el rol específico (professional, reception, staff)
+          specialty: member.specialty || '',
+          color_code: member.color_code || '#4CAF50',
+          is_professional: member.is_professional || false,
+          accepts_walk_ins: member.accepts_walk_ins || false
         })),
         services: services.map(serv => ({
           name: serv.name,
@@ -414,16 +510,20 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
           price: serv.price,
           buffer_time_before: serv.buffer_time_before || 0,
           buffer_time_after: serv.buffer_time_after || 10,
-          is_active: serv.is_active,
-          requires_preparation: serv.requires_preparation
+          is_active: serv.is_active !== undefined ? serv.is_active : true,
+          requires_preparation: serv.requires_preparation !== undefined ? serv.requires_preparation : false
         }))
       }
 
+      console.log('🚀 Datos finales a enviar al backend:', JSON.stringify(onboardingData, null, 2))
       await OnboardingService.completeOnboarding(onboardingData)
       
       // Limpiar datos temporales y progreso guardado
       OnboardingService.clearOnboardingData()
       localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem('team_setup_data')
+      localStorage.removeItem('registration_form_data')
+      localStorage.removeItem('selected_plan_data')
       console.log('🗑️ Progreso limpiado después de completar onboarding')
       
       markStepCompleted(currentStep)
@@ -433,7 +533,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     } finally {
       setIsCompleting(false)
     }
-  }, [registrationToken, organizationData, professionals, services, markStepCompleted, currentStep])
+  }, [registrationToken, organizationData, services, markStepCompleted, currentStep])
 
   // Reset del onboarding
   const resetOnboarding = useCallback(() => {

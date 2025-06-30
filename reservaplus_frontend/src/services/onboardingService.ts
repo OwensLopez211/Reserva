@@ -53,6 +53,12 @@ export interface OnboardingCompleteResponse {
       status: string
       trial_end: string
     }
+    team_members: Array<{
+      id: string
+      name: string
+      email: string
+      role: string
+    }>
     professionals: Array<{
       id: string
       name: string
@@ -142,7 +148,7 @@ export class OnboardingService {
    */
   static async completeOnboarding(data: OnboardingCompleteData): Promise<OnboardingCompleteResponse> {
     try {
-      console.log('🔄 Completando onboarding:', data)
+      console.log('🔄 Completando onboarding con datos:', JSON.stringify(data, null, 2))
       
       const response = await api.post('/api/onboarding/complete/', data)
       
@@ -164,21 +170,55 @@ export class OnboardingService {
             data?: { 
               error?: string
               details?: unknown
+              message?: string
             }
             status?: number
+            statusText?: string
           } 
+        }
+        
+        // Log completo del error para debugging
+        if (errObj.response) {
+          console.error('💥 Error response completo:', {
+            status: errObj.response.status,
+            statusText: errObj.response.statusText,
+            data: errObj.response.data
+          })
         }
         
         if (errObj.response?.data?.error) {
           throw new Error(errObj.response.data.error)
         }
         
-        if (errObj.response?.status === 400 && errObj.response?.data?.details) {
-          throw new Error(`Datos inválidos: ${JSON.stringify(errObj.response.data.details)}`)
+        if (errObj.response?.data?.message) {
+          throw new Error(errObj.response.data.message)
         }
+        
+        if (errObj.response?.status === 400) {
+          const details = errObj.response.data?.details
+          if (details) {
+            throw new Error(`Datos inválidos: ${JSON.stringify(details, null, 2)}`)
+          } else {
+            throw new Error(`Error 400: ${JSON.stringify(errObj.response.data, null, 2)}`)
+          }
+        }
+        
+        if (errObj.response?.status === 401) {
+          throw new Error('Token de registro inválido o expirado')
+        }
+        
+        if (errObj.response?.status === 403) {
+          throw new Error('No tienes permisos para realizar esta acción')
+        }
+        
+        if (errObj.response?.status === 500) {
+          throw new Error('Error interno del servidor. Por favor, intenta más tarde.')
+        }
+        
+        throw new Error(`Error ${errObj.response?.status}: ${errObj.response?.statusText || 'Error desconocido'}`)
       }
       
-      throw new Error('Error al completar el onboarding')
+      throw new Error('Error de conexión al completar el onboarding')
     }
   }
 
@@ -187,7 +227,11 @@ export class OnboardingService {
    */
   static async checkRegistrationStatus(token: string): Promise<{
     is_valid: boolean
-    selected_plan?: any
+    selected_plan?: {
+      id: string
+      name: string
+      price_monthly: number
+    }
     expires_at?: string
   }> {
     try {
@@ -312,9 +356,20 @@ export class OnboardingService {
    * Validar datos del onboarding antes de enviar
    */
   static validateOnboardingData(data: {
-    organization: any
-    professionals: any[]
-    services: any[]
+    organization: {
+      name?: string
+      email?: string
+      phone?: string
+    }
+    professionals: Array<{
+      name?: string
+      email?: string
+    }>
+    services: Array<{
+      name?: string
+      price?: number
+      duration_minutes?: number
+    }>
   }): { isValid: boolean; errors: string[] } {
     const errors: string[] = []
 

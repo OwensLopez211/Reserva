@@ -26,36 +26,143 @@ import OnboardingWelcomePage from './pages/onboarding/OnboardingWelcomePage'
 import ServicesSetupPage from './pages/onboarding/ServicesSetupPage'
 
 // Páginas privadas
-import DashboardPage from './pages/dashboard/DashboardPage'
+import RoleDashboard from './components/dashboard/RoleDashboard'
+import CalendarPage from './pages/calendar/CalendarPage'
+import TeamPage from './pages/team/TeamPage'
 
 import './App.css'
 
-// Páginas temporales para las rutas privadas con animaciones
-const ReservasPage = () => (
+const SalesPage = () => (
   <div className="animate-fadeIn">
-    <h1 className="text-3xl font-bold text-gray-900">Mis Reservas</h1>
-    <p className="mt-4 text-gray-600">Gestiona tus reservas aquí</p>
+    <h1 className="text-3xl font-bold text-gray-900">Historial de Ventas</h1>
+    <p className="mt-4 text-gray-600">Revisa todas las ventas realizadas</p>
   </div>
 )
 
-const ClientesPage = () => (
+const ServicesPage = () => (
+  <div className="animate-fadeIn">
+    <h1 className="text-3xl font-bold text-gray-900">Servicios</h1>
+    <p className="mt-4 text-gray-600">Gestiona tus servicios y productos</p>
+  </div>
+)
+
+const PromotionsPage = () => (
+  <div className="animate-fadeIn">
+    <h1 className="text-3xl font-bold text-gray-900">Promociones</h1>
+    <p className="mt-4 text-gray-600">Crea y gestiona promociones especiales</p>
+  </div>
+)
+
+const RemindersPage = () => (
+  <div className="animate-fadeIn">
+    <h1 className="text-3xl font-bold text-gray-900">Recordatorios</h1>
+    <p className="mt-4 text-gray-600">Configura recordatorios automáticos</p>
+  </div>
+)
+
+const ClientsPage = () => (
   <div className="animate-fadeIn">
     <h1 className="text-3xl font-bold text-gray-900">Clientes</h1>
     <p className="mt-4 text-gray-600">Gestiona tu base de clientes</p>
   </div>
 )
 
-const PerfilPage = () => (
+// TeamPage ahora se importa desde el archivo real
+
+const SettingsPage = () => (
+  <div className="animate-fadeIn">
+    <h1 className="text-3xl font-bold text-gray-900">Configuración</h1>
+    <p className="mt-4 text-gray-600">Configura tu organización y preferencias</p>
+  </div>
+)
+
+const ProfilePage = () => (
   <div className="animate-fadeIn">
     <h1 className="text-3xl font-bold text-gray-900">Mi Perfil</h1>
     <p className="mt-4 text-gray-600">Gestiona tu información personal</p>
   </div>
 )
 
-const ConfiguracionPage = () => (
+const SubscriptionPage = () => (
   <div className="animate-fadeIn">
-    <h1 className="text-3xl font-bold text-gray-900">Configuración</h1>
-    <p className="mt-4 text-gray-600">Configura tu organización y preferencias</p>
+    <h1 className="text-3xl font-bold text-gray-900">Suscripción</h1>
+    <p className="mt-4 text-gray-600">Gestiona tu plan y facturación</p>
+  </div>
+)
+
+// Páginas de reportes
+const SalesReportPage = () => (
+  <div className="animate-fadeIn">
+    <h1 className="text-3xl font-bold text-gray-900">Reportes de Ventas</h1>
+    <p className="mt-4 text-gray-600">Analiza tus ventas y rendimiento</p>
+  </div>
+)
+
+const ClientsReportPage = () => (
+  <div className="animate-fadeIn">
+    <h1 className="text-3xl font-bold text-gray-900">Reportes de Clientes</h1>
+    <p className="mt-4 text-gray-600">Analiza el comportamiento de tus clientes</p>
+  </div>
+)
+
+const StaffReportPage = () => (
+  <div className="animate-fadeIn">
+    <h1 className="text-3xl font-bold text-gray-900">Reportes del Equipo</h1>
+    <p className="mt-4 text-gray-600">Analiza el rendimiento de tu equipo</p>
+  </div>
+)
+
+// Páginas de administración
+const AdminServicesPage = () => (
+  <div className="animate-fadeIn">
+    <h1 className="text-3xl font-bold text-gray-900">Configurar Servicios</h1>
+    <p className="mt-4 text-gray-600">Configura servicios, precios y duraciones</p>
+  </div>
+)
+
+const AdminSchedulesPage = () => (
+  <div className="animate-fadeIn">
+    <h1 className="text-3xl font-bold text-gray-900">Configurar Horarios</h1>
+    <p className="mt-4 text-gray-600">Gestiona horarios de trabajo y disponibilidad</p>
+  </div>
+)
+
+// Páginas específicas para profesionales - usar el mismo CalendarPage
+const MyCalendarPage = CalendarPage
+
+const MyClientsPage = () => (
+  <div className="animate-fadeIn">
+    <h1 className="text-3xl font-bold text-gray-900">Mis Clientes</h1>
+    <p className="mt-4 text-gray-600">Gestiona tus clientes asignados</p>
+  </div>
+)
+
+const MySchedulePage = () => (
+  <div className="animate-fadeIn">
+    <h1 className="text-3xl font-bold text-gray-900">Mi Horario</h1>
+    <p className="mt-4 text-gray-600">Configura tu horario de trabajo</p>
+  </div>
+)
+
+// Páginas adicionales
+const SearchPage = () => (
+  <div className="animate-fadeIn">
+    <h1 className="text-3xl font-bold text-gray-900">Buscar</h1>
+    <p className="mt-4 text-gray-600">Resultados de búsqueda</p>
+  </div>
+)
+
+const GettingStartedPage = () => (
+  <div className="animate-fadeIn">
+    <h1 className="text-3xl font-bold text-gray-900">Primeros Pasos</h1>
+    <p className="mt-4 text-gray-600">Aprende a usar ReservaPlus</p>
+  </div>
+)
+
+const WebsitePage = () => (
+  <div className="animate-fadeIn">
+    <h1 className="text-3xl font-bold text-gray-900">Sitio Web</h1>
+    <p className="mt-4 text-gray-600">Gestiona tu presencia en línea</p>
   </div>
 )
 
@@ -293,21 +400,66 @@ function App() {
                     </ProtectedRoute>
                   }
                 >
-                  <Route path="dashboard" element={<DashboardPage />} />
-                  <Route path="reservas" element={<ReservasPage />} />
-                  <Route path="clientes" element={<ClientesPage />} />
-                  <Route path="perfil" element={<PerfilPage />} />
-                  <Route path="configuracion" element={<ConfiguracionPage />} />
+                  {/* Dashboard */}
+                  <Route path="dashboard" element={<RoleDashboard />} />
+                  
+                  {/* Calendario */}
+                  <Route path="calendar" element={<CalendarPage />} />
+                  <Route path="my-calendar" element={<MyCalendarPage />} />
+                  
+                  {/* Ventas */}
+                  <Route path="sales" element={<SalesPage />} />
+                  <Route path="services" element={<ServicesPage />} />
+                  <Route path="promotions" element={<PromotionsPage />} />
+                  
+                  {/* Recordatorios */}
+                  <Route path="reminders" element={<RemindersPage />} />
+                  
+                  {/* Clientes */}
+                  <Route path="clients" element={<ClientsPage />} />
+                  <Route path="my-clients" element={<MyClientsPage />} />
+                  
+                  {/* Reportes */}
+                  <Route path="reports/sales" element={<SalesReportPage />} />
+                  <Route path="reports/clients" element={<ClientsReportPage />} />
+                  <Route path="reports/staff" element={<StaffReportPage />} />
+                  
+                  {/* Administración */}
+                  <Route path="team" element={<TeamPage />} />
+                  <Route path="admin/services" element={<AdminServicesPage />} />
+                  <Route path="admin/schedules" element={<AdminSchedulesPage />} />
+                  
+                  {/* Configuración y perfil */}
+                  <Route path="settings" element={<SettingsPage />} />
+                  <Route path="profile" element={<ProfilePage />} />
+                  <Route path="subscription" element={<SubscriptionPage />} />
+                  
+                  {/* Horarios personales */}
+                  <Route path="my-schedule" element={<MySchedulePage />} />
+                  
+                  {/* Búsqueda */}
+                  <Route path="search" element={<SearchPage />} />
+                  
+                  {/* Páginas adicionales */}
+                  <Route path="getting-started" element={<GettingStartedPage />} />
+                  <Route path="website" element={<WebsitePage />} />
+                  
+                  {/* Rutas de compatibilidad */}
+                  <Route path="reservas" element={<CalendarPage />} />
+                  <Route path="clientes" element={<ClientsPage />} />
+                  <Route path="perfil" element={<ProfilePage />} />
+                  <Route path="configuracion" element={<SettingsPage />} />
+                  
                   {/* Ruta por defecto de la app */}
                   <Route index element={<Navigate to="/app/dashboard" replace />} />
                 </Route>
 
                 {/* Rutas de redirección */}
                 <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
-                <Route path="/reservas" element={<Navigate to="/app/reservas" replace />} />
-                <Route path="/clientes" element={<Navigate to="/app/clientes" replace />} />
-                <Route path="/perfil" element={<Navigate to="/app/perfil" replace />} />
-                <Route path="/configuracion" element={<Navigate to="/app/configuracion" replace />} />
+                <Route path="/reservas" element={<Navigate to="/app/calendar" replace />} />
+                <Route path="/clientes" element={<Navigate to="/app/clients" replace />} />
+                <Route path="/perfil" element={<Navigate to="/app/profile" replace />} />
+                <Route path="/configuracion" element={<Navigate to="/app/settings" replace />} />
 
                 {/* Ruta por defecto */}
                 <Route path="*" element={<Navigate to="/" replace />} />

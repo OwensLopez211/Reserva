@@ -16,10 +16,13 @@ class Command(BaseCommand):
             defaults={
                 'name': 'Básico',
                 'description': 'Todo lo que necesitas para profesionalizar tu negocio',
-                'price_monthly': 29990,
-                'price_yearly': 299990,
-                'original_price': 59990,
+                'price_monthly': 14990,
+                'price_yearly': 149900,
+                'original_price': 29990,  # Precio original mensual antes del descuento
+                'max_users': 6,  # 1 propietario + 1-2 recepcionistas + 3 profesionales + 0-1 staff
                 'max_professionals': 3,
+                'max_receptionists': 1,  # 1 básico + 1 adicional (o staff)
+                'max_staff': 1,
                 'max_services': 20,
                 'max_monthly_appointments': 500,
                 'max_clients': 1000,
@@ -35,7 +38,7 @@ class Command(BaseCommand):
                     'Panel de control básico',
                     'Soporte personalizado',
                     'Recordatorios por email',
-                    '$12.990 por profesional adicional'
+                    '$3.990 por profesional adicional'
                 ],
                 'supports_integrations': False,
                 'supports_advanced_reports': False,
@@ -45,7 +48,7 @@ class Command(BaseCommand):
                 'is_popular': True,
                 'color_scheme': 'emerald',
                 'badge_text': 'Más Popular',
-                'discount_text': '-17%',
+                'discount_text': 'Ahorra 17% anual',  # Descuento al pagar anualmente
                 'display_order': 1
             }
         )
@@ -62,8 +65,12 @@ class Command(BaseCommand):
                 'name': 'Profesional',
                 'description': 'Para equipos que buscan crecer y optimizar',
                 'price_monthly': 49990,
-                'price_yearly': 499990,
+                'price_yearly': 499900,  # Manteniendo proporción similar
+                'original_price': 79990,  # Precio original mensual
+                'max_users': 15,  # Hasta 15 usuarios para gestionar 10 profesionales
                 'max_professionals': 10,
+                'max_receptionists': 3,
+                'max_staff': 2,
                 'max_services': 100,
                 'max_monthly_appointments': 2000,
                 'max_clients': 5000,
@@ -86,6 +93,7 @@ class Command(BaseCommand):
                 'priority_support': True,
                 'is_coming_soon': True,
                 'color_scheme': 'blue',
+                'discount_text': 'Ahorra 17% anual',
                 'display_order': 2
             }
         )
@@ -102,8 +110,12 @@ class Command(BaseCommand):
                 'name': 'Empresarial',
                 'description': 'Solución completa para grandes organizaciones',
                 'price_monthly': 99990,
-                'price_yearly': 999990,
+                'price_yearly': 999900,  # Manteniendo proporción similar
+                'original_price': 159990,  # Precio original mensual
+                'max_users': 100,  # Hasta 100 usuarios para gestionar 50 profesionales
                 'max_professionals': 50,
+                'max_receptionists': 10,
+                'max_staff': 5,
                 'max_services': 500,
                 'max_monthly_appointments': 10000,
                 'max_clients': 25000,
@@ -126,6 +138,7 @@ class Command(BaseCommand):
                 'priority_support': True,
                 'is_coming_soon': True,
                 'color_scheme': 'purple',
+                'discount_text': 'Ahorra 17% anual',
                 'display_order': 3
             }
         )

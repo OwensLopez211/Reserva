@@ -17,10 +17,32 @@ export const tokenManager = {
   setTokens: (accessToken: string, refreshToken: string) => {
     localStorage.setItem('access_token', accessToken)
     localStorage.setItem('refresh_token', refreshToken)
+    console.log('🔑 Tokens guardados en localStorage')
   },
   clearTokens: () => {
+    console.log('🗑️ Limpiando tokens del localStorage...')
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
+    
+    // Verificar que realmente se eliminaron
+    const accessToken = localStorage.getItem('access_token')
+    const refreshToken = localStorage.getItem('refresh_token')
+    
+    if (accessToken || refreshToken) {
+      console.error('⚠️ Error: Los tokens no se eliminaron correctamente')
+      console.log('Access token restante:', accessToken)
+      console.log('Refresh token restante:', refreshToken)
+      
+      // Forzar eliminación
+      try {
+        localStorage.clear()
+        console.log('🧹 localStorage completamente limpiado como fallback')
+      } catch (error) {
+        console.error('❌ Error al limpiar localStorage:', error)
+      }
+    } else {
+      console.log('✅ Tokens eliminados correctamente')
+    }
   }
 }
 
@@ -83,15 +105,30 @@ api.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
           return api(originalRequest)
         } catch (refreshError) {
-          console.log('Error renovando token, redirigiendo a login')
+          console.log('Error renovando token, limpiando sesión y redirigiendo a login')
+          console.error('Refresh token error:', refreshError)
           tokenManager.clearTokens()
-          if (!window.location.pathname.includes('/login')) {
+          // Limpiar datos de onboarding también
+          localStorage.removeItem('registration_form_data')
+          localStorage.removeItem('selected_plan_data')
+          localStorage.removeItem('team_setup_data')
+          localStorage.removeItem('services_setup_data')
+          localStorage.removeItem('organization_config_data')
+          
+          if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/onboarding')) {
             window.location.href = '/login'
           }
         }
       } else {
-        console.log('No hay refresh token, redirigiendo a login')
-        if (!window.location.pathname.includes('/login')) {
+        console.log('No hay refresh token, limpiando sesión y redirigiendo a login')
+        // Limpiar datos de onboarding también
+        localStorage.removeItem('registration_form_data')
+        localStorage.removeItem('selected_plan_data')
+        localStorage.removeItem('team_setup_data')
+        localStorage.removeItem('services_setup_data')
+        localStorage.removeItem('organization_config_data')
+        
+        if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/onboarding')) {
           window.location.href = '/login'
         }
       }

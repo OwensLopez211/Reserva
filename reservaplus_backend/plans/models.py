@@ -36,9 +36,23 @@ class Plan(models.Model):
     )
     
     # Límites del plan
+    max_users = models.IntegerField(
+        verbose_name="Máximo de Usuarios",
+        help_text="Número máximo de usuarios del sistema permitidos"
+    )
     max_professionals = models.IntegerField(
         verbose_name="Máximo de Profesionales",
         help_text="Número máximo de profesionales permitidos"
+    )
+    max_receptionists = models.IntegerField(
+        default=1,
+        verbose_name="Máximo de Recepcionistas",
+        help_text="Número máximo de recepcionistas permitidos"
+    )
+    max_staff = models.IntegerField(
+        default=1,
+        verbose_name="Máximo de Staff",
+        help_text="Número máximo de staff permitidos"
     )
     max_services = models.IntegerField(
         verbose_name="Máximo de Servicios",
@@ -126,9 +140,21 @@ class Plan(models.Model):
             return round(discount)
         return 0
     
+    def can_create_user(self, current_count):
+        """Verificar si se puede crear otro usuario"""
+        return current_count < self.max_users
+    
     def can_create_professional(self, current_count):
         """Verificar si se puede crear otro profesional"""
         return current_count < self.max_professionals
+    
+    def can_create_receptionist(self, current_count):
+        """Verificar si se puede crear otro recepcionista"""
+        return current_count < self.max_receptionists
+    
+    def can_create_staff(self, current_count):
+        """Verificar si se puede crear otro staff"""
+        return current_count < self.max_staff
     
     def can_create_service(self, current_count):
         """Verificar si se puede crear otro servicio"""
@@ -289,7 +315,10 @@ class OrganizationSubscription(models.Model):
     current_period_end = models.DateTimeField()
     
     # Uso actual (para verificar límites)
+    current_users_count = models.PositiveIntegerField(default=0)
     current_professionals_count = models.PositiveIntegerField(default=0)
+    current_receptionists_count = models.PositiveIntegerField(default=0)
+    current_staff_count = models.PositiveIntegerField(default=0)
     current_services_count = models.PositiveIntegerField(default=0)
     current_clients_count = models.PositiveIntegerField(default=0)
     current_month_appointments_count = models.PositiveIntegerField(default=0)
@@ -316,9 +345,21 @@ class OrganizationSubscription(models.Model):
         """Verificar si la suscripción está activa"""
         return self.status in ['trial', 'active']
     
+    def can_add_user(self):
+        """Verificar si puede agregar otro usuario"""
+        return self.current_users_count < self.plan.max_users
+    
     def can_add_professional(self):
         """Verificar si puede agregar otro profesional"""
         return self.current_professionals_count < self.plan.max_professionals
+    
+    def can_add_receptionist(self):
+        """Verificar si puede agregar otro recepcionista"""
+        return self.current_receptionists_count < self.plan.max_receptionists
+    
+    def can_add_staff(self):
+        """Verificar si puede agregar otro staff"""
+        return self.current_staff_count < self.plan.max_staff
     
     def can_add_service(self):
         """Verificar si puede agregar otro servicio"""
@@ -332,6 +373,17 @@ class OrganizationSubscription(models.Model):
         """Verificar si puede crear otra cita este mes"""
         return self.current_month_appointments_count < self.plan.max_monthly_appointments
     
+    def increment_users_count(self):
+        """Incrementar contador de usuarios"""
+        self.current_users_count += 1
+        self.save(update_fields=['current_users_count'])
+    
+    def decrement_users_count(self):
+        """Decrementar contador de usuarios"""
+        if self.current_users_count > 0:
+            self.current_users_count -= 1
+            self.save(update_fields=['current_users_count'])
+    
     def increment_professionals_count(self):
         """Incrementar contador de profesionales"""
         self.current_professionals_count += 1
@@ -342,6 +394,28 @@ class OrganizationSubscription(models.Model):
         if self.current_professionals_count > 0:
             self.current_professionals_count -= 1
             self.save(update_fields=['current_professionals_count'])
+    
+    def increment_receptionists_count(self):
+        """Incrementar contador de recepcionistas"""
+        self.current_receptionists_count += 1
+        self.save(update_fields=['current_receptionists_count'])
+    
+    def decrement_receptionists_count(self):
+        """Decrementar contador de recepcionistas"""
+        if self.current_receptionists_count > 0:
+            self.current_receptionists_count -= 1
+            self.save(update_fields=['current_receptionists_count'])
+    
+    def increment_staff_count(self):
+        """Incrementar contador de staff"""
+        self.current_staff_count += 1
+        self.save(update_fields=['current_staff_count'])
+    
+    def decrement_staff_count(self):
+        """Decrementar contador de staff"""
+        if self.current_staff_count > 0:
+            self.current_staff_count -= 1
+            self.save(update_fields=['current_staff_count'])
     
     def increment_services_count(self):
         """Incrementar contador de servicios"""

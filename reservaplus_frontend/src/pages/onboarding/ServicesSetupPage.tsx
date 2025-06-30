@@ -14,7 +14,6 @@ const ServicesSetupPage: React.FC = () => {
     addService, 
     updateService, 
     removeService,
-    loadSuggestedServices,
     organizationData,
     canProceedFromStep,
     completeOnboarding,
@@ -27,17 +26,14 @@ const ServicesSetupPage: React.FC = () => {
   const [showSuggested, setShowSuggested] = useState(true)
   const [completionError, setCompletionError] = useState<string>('')
 
-  // Cargar servicios sugeridos basados en la industria
+  // Verificar token de registro pero NO cargar servicios automáticamente
   useEffect(() => {
     if (!registrationToken) {
       navigate('/onboarding/plan')
       return
     }
-
-    if (services.length === 0 && organizationData.industry_template) {
-      loadSuggestedServices(organizationData.industry_template)
-    }
-  }, [registrationToken, services.length, organizationData.industry_template, loadSuggestedServices, navigate])
+    // NO cargar servicios automáticamente - el usuario debe elegir
+  }, [registrationToken, navigate])
 
   const getIndustryTerms = () => {
     const terms: {[key: string]: {service: string, services: string}} = {
@@ -126,7 +122,7 @@ const ServicesSetupPage: React.FC = () => {
   }
 
   const handleAddSuggestedService = (suggested: Partial<typeof services[0]>) => {
-    handleAddService(suggested)
+    addService(suggested)
   }
 
   const validateForm = (): boolean => {

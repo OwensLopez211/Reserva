@@ -18,7 +18,7 @@ import { OnboardingProgressIndicator } from '../../components/onboarding/Onboard
 
 const OnboardingCompletePage: React.FC = () => {
   const navigate = useNavigate()
-  const { completeOnboarding, organizationData, professionals, services, planInfo } = useOnboarding()
+  const { completeOnboarding, organizationData, professionals, services, planInfo, registrationToken } = useOnboarding()
   const { checkAuth } = useAuth()
   
   const [isLoading, setIsLoading] = useState(false)
@@ -27,10 +27,40 @@ const OnboardingCompletePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // Verificar que tenemos datos necesarios para completar el onboarding
+    console.log('🔍 Verificando datos del onboarding:', {
+      registrationToken: !!registrationToken,
+      organizationData,
+      professionals,
+      services: services.length,
+      planInfo
+    })
+
+    // Si no hay token de registro, redirigir al inicio
+    if (!registrationToken) {
+      console.warn('⚠️ No hay token de registro, redirigiendo al plan')
+      navigate('/onboarding/plan')
+      return
+    }
+
+    // Si no hay datos básicos de organización, redirigir al registro
+    if (!organizationData.name || !organizationData.email) {
+      console.warn('⚠️ Faltan datos de organización, redirigiendo al registro')
+      navigate('/onboarding/register')
+      return
+    }
+
+    // Si no hay servicios, redirigir a servicios
+    if (services.length === 0) {
+      console.warn('⚠️ No hay servicios configurados, redirigiendo a servicios')
+      navigate('/onboarding/services')
+      return
+    }
+    
     // Activar confetti al cargar la página
     setShowConfetti(true)
     setTimeout(() => setShowConfetti(false), 3000)
-  }, [])
+  }, [registrationToken, organizationData, services, navigate])
 
   const completedSteps = [
     {

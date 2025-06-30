@@ -16,6 +16,8 @@ export interface User {
   organization_name: string
   is_active_in_org: boolean
   date_joined: string
+  last_login: string
+  last_login_local: string
   created_at: string
   updated_at: string
 }
@@ -122,16 +124,58 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   const logout = async () => {
+    console.log('🚪 AuthContext: Iniciando logout...')
+    
     try {
+      console.log('📡 Notificando logout al servidor...')
       // Notificar al servidor (opcional para JWT)
       await api.post('/api/auth/logout/')
+      console.log('✅ Servidor notificado del logout')
     } catch (error) {
-      console.log('Error al notificar logout al servidor:', error)
-    } finally {
+      console.log('⚠️ Error al notificar logout al servidor (continuando con limpieza local):', error)
+    }
+    
+    // SIEMPRE limpiar datos locales, sin importar si el servidor respondió
+    try {
+      console.log('🧹 Limpiando tokens y datos locales...')
+      
       // Limpiar tokens del localStorage
       tokenManager.clearTokens()
+      
+      // Limpiar TODOS los datos de sesión y onboarding
+      const keysToRemove = [
+        'registration_form_data',
+        'selected_plan_data', 
+        'team_setup_data',
+        'services_setup_data',
+        'organization_config_data',
+        'onboarding_step',
+        'completed_steps'
+      ]
+      
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key)
+        console.log(`🗑️ Removido: ${key}`)
+      })
+      
+      // Limpiar estado del usuario
       setUser(null)
-      console.log('Logout completado, tokens eliminados')
+      setLoading(false)
+      
+      console.log('✅ Logout completado - todos los datos eliminados')
+      console.log('📍 Estado final del localStorage:', {
+        access_token: localStorage.getItem('access_token'),
+        refresh_token: localStorage.getItem('refresh_token'),
+        registration_data: localStorage.getItem('registration_form_data')
+      })
+      
+    } catch (cleanupError) {
+      console.error('❌ Error durante limpieza local:', cleanupError)
+      // Fallback: limpiar completamente el localStorage
+      localStorage.clear()
+      setUser(null)
+      setLoading(false)
+      console.log('🧹 Fallback: localStorage completamente limpiado')
     }
   }
 
