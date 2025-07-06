@@ -13,7 +13,6 @@ import {
   Clock,
   User,
   DollarSign,
-  BookOpen,
   CreditCard
 } from 'lucide-react'
 
@@ -34,12 +33,12 @@ const Navigation: React.FC = () => {
   const { performLogout } = useLogout()
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const navigationRef = useRef<HTMLDivElement>(null)
 
   // Cerrar dropdowns al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (navigationRef.current && !navigationRef.current.contains(event.target as Node)) {
         setActiveDropdown(null)
         setUserMenuOpen(false)
       }
@@ -81,8 +80,8 @@ const Navigation: React.FC = () => {
             icon: Settings,
             dropdown: [
               { name: 'Equipo', href: '/app/team', description: 'Gestionar profesionales' },
-              { name: 'Servicios', href: '/app/admin/services', description: 'Configurar servicios' },
-              { name: 'Horarios', href: '/app/admin/schedules', description: 'Configurar horarios' },
+              { name: 'Servicios', href: '/app/services', description: 'Configurar servicios' },
+              { name: 'Horarios', href: '/app/schedules', description: 'Configurar horarios' },
               { name: 'Configuración', href: '/app/settings', description: 'Configuración general' }
             ]
           }
@@ -114,8 +113,8 @@ const Navigation: React.FC = () => {
             name: 'Administración',
             icon: Settings,
             dropdown: [
-              { name: 'Servicios', href: '/app/admin/services', description: 'Configurar servicios' },
-              { name: 'Horarios', href: '/app/admin/schedules', description: 'Configurar horarios' }
+              { name: 'Servicios', href: '/app/services', description: 'Configurar servicios' },
+              { name: 'Horarios', href: '/app/schedules', description: 'Configurar horarios' }
             ]
           }
         ]
@@ -162,6 +161,13 @@ const Navigation: React.FC = () => {
     setActiveDropdown(null)
   }
 
+  const handleDropdownLinkClick = () => {
+    // Cerrar dropdown después de un pequeño delay para permitir que la navegación ocurra
+    setTimeout(() => {
+      setActiveDropdown(null)
+    }, 100)
+  }
+
   return (
     <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="w-full px-4 sm:px-6 lg:px-8">
@@ -176,7 +182,7 @@ const Navigation: React.FC = () => {
           </div>
 
           {/* Navegación principal */}
-          <div className="hidden md:flex items-center space-x-8" ref={dropdownRef}>
+          <div className="hidden md:flex items-center space-x-8" ref={navigationRef}>
             {navigation.map((item) => {
               const Icon = item.icon
               const isActive = item.href === location.pathname
@@ -220,8 +226,8 @@ const Navigation: React.FC = () => {
                         <Link
                           key={dropdownItem.name}
                           to={dropdownItem.href}
-                          className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
-                          onClick={() => setActiveDropdown(null)}
+                          className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                          onClick={handleDropdownLinkClick}
                         >
                           <div className="font-medium">{dropdownItem.name}</div>
                           {dropdownItem.description && (
@@ -238,36 +244,13 @@ const Navigation: React.FC = () => {
 
           {/* Elementos de la derecha */}
           <div className="flex items-center space-x-4">
-            {/* Búsqueda */}
-            {/* <form onSubmit={handleSearch} className="hidden md:flex items-center">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-              </div>
-            </form> */}
-
             {/* Primeros pasos */}
-            <Link
+{/*             <Link
               to="/app/getting-started"
               className="hidden md:flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-md transition-colors"
             >
               <BookOpen className="h-4 w-4" />
               <span>Primeros pasos</span>
-            </Link>
-
-            {/* Sitio web */}
-            {/* <Link
-              to="/app/website"
-              className="hidden md:flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-md transition-colors"
-            >
-              <Globe className="h-4 w-4" />
-              <span>Sitio web</span>
             </Link> */}
 
             {/* Configuración */}
@@ -359,6 +342,45 @@ const Navigation: React.FC = () => {
           {navigation.map((item) => {
             const Icon = item.icon
             const isActive = item.href === location.pathname
+            const hasDropdown = item.dropdown && item.dropdown.length > 0
+
+            if (hasDropdown) {
+              return (
+                <div key={item.name} className="space-y-1">
+                  <button
+                    onClick={() => toggleDropdown(item.name)}
+                    className={`flex items-center justify-between w-full px-3 py-2 rounded-md text-base font-medium ${
+                      activeDropdown === item.name
+                        ? 'text-primary-600 bg-primary-50'
+                        : 'text-gray-700 hover:text-primary-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Icon className="h-5 w-5" />
+                      <span>{item.name}</span>
+                    </div>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${
+                      activeDropdown === item.name ? 'rotate-180' : ''
+                    }`} />
+                  </button>
+                  
+                  {activeDropdown === item.name && (
+                    <div className="pl-4 space-y-1">
+                      {item.dropdown?.map((dropdownItem) => (
+                        <Link
+                          key={dropdownItem.name}
+                          to={dropdownItem.href}
+                          className="block px-3 py-2 text-sm text-gray-600 hover:text-primary-600 hover:bg-gray-50 rounded-md"
+                          onClick={handleDropdownLinkClick}
+                        >
+                          {dropdownItem.name}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            }
 
             return (
               <Link

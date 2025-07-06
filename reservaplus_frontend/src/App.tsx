@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { OnboardingProvider } from './contexts/OnboardingContext'
 import { TransitionProvider } from './contexts/TransitionContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import RoleProtectedRoute from './components/RoleProtectedRoute'
 import { OnboardingGuard } from './components/onboarding/OnboardingGuard'
 import { OnboardingNavigator } from './components/onboarding/OnboardingNavigator'
 import PublicLayout from './components/layouts/PublicLayout'
@@ -29,6 +30,9 @@ import ServicesSetupPage from './pages/onboarding/ServicesSetupPage'
 import RoleDashboard from './components/dashboard/RoleDashboard'
 import CalendarPage from './pages/calendar/CalendarPage'
 import TeamPage from './pages/team/TeamPage'
+import SchedulesPage from './pages/SchedulesPage'
+import ServicesPage from './pages/ServicesPage'
+import SettingsPage from './pages/SettingsPage'
 
 import './App.css'
 
@@ -39,12 +43,7 @@ const SalesPage = () => (
   </div>
 )
 
-const ServicesPage = () => (
-  <div className="animate-fadeIn">
-    <h1 className="text-3xl font-bold text-gray-900">Servicios</h1>
-    <p className="mt-4 text-gray-600">Gestiona tus servicios y productos</p>
-  </div>
-)
+
 
 const PromotionsPage = () => (
   <div className="animate-fadeIn">
@@ -69,12 +68,7 @@ const ClientsPage = () => (
 
 // TeamPage ahora se importa desde el archivo real
 
-const SettingsPage = () => (
-  <div className="animate-fadeIn">
-    <h1 className="text-3xl font-bold text-gray-900">Configuración</h1>
-    <p className="mt-4 text-gray-600">Configura tu organización y preferencias</p>
-  </div>
-)
+
 
 const ProfilePage = () => (
   <div className="animate-fadeIn">
@@ -113,19 +107,6 @@ const StaffReportPage = () => (
 )
 
 // Páginas de administración
-const AdminServicesPage = () => (
-  <div className="animate-fadeIn">
-    <h1 className="text-3xl font-bold text-gray-900">Configurar Servicios</h1>
-    <p className="mt-4 text-gray-600">Configura servicios, precios y duraciones</p>
-  </div>
-)
-
-const AdminSchedulesPage = () => (
-  <div className="animate-fadeIn">
-    <h1 className="text-3xl font-bold text-gray-900">Configurar Horarios</h1>
-    <p className="mt-4 text-gray-600">Gestiona horarios de trabajo y disponibilidad</p>
-  </div>
-)
 
 // Páginas específicas para profesionales - usar el mismo CalendarPage
 const MyCalendarPage = CalendarPage
@@ -425,9 +406,13 @@ function App() {
                   <Route path="reports/staff" element={<StaffReportPage />} />
                   
                   {/* Administración */}
-                  <Route path="team" element={<TeamPage />} />
-                  <Route path="admin/services" element={<AdminServicesPage />} />
-                  <Route path="admin/schedules" element={<AdminSchedulesPage />} />
+                  <Route path="team" element={
+                    <RoleProtectedRoute allowedRoles={['owner']}>
+                      <TeamPage />
+                    </RoleProtectedRoute>
+                  } />
+  
+                  <Route path="schedules" element={<SchedulesPage />} />
                   
                   {/* Configuración y perfil */}
                   <Route path="settings" element={<SettingsPage />} />

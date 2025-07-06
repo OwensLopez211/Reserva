@@ -26,6 +26,9 @@ urlpatterns = [
         # Appointments
         path('appointments/', include('appointments.urls')),
         
+        # Schedule
+        path('schedule/', include('schedule.urls')),
+        
         # API Rest Framework (para navegación)
         path('', include('rest_framework.urls')),
     ])),

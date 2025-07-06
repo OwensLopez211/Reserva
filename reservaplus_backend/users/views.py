@@ -12,8 +12,8 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
 from core.authentication import generate_access_token, generate_refresh_token, verify_refresh_token, JWTAuthentication
-from .models import User
-from .serializers import UserSerializer, LoginSerializer, UserCreateSerializer
+from .models import User, UserProfile
+from .serializers import UserSerializer, LoginSerializer, UserCreateSerializer, UserUpdateSerializer, UserProfileSerializer
 
 
 def get_chile_local_time():
@@ -524,3 +524,141 @@ class UserRolesView(APIView):
         ]
         
         return Response(roles)
+
+
+# ============================================
+# NUEVAS VISTAS PARA GESTIÓN DE PERFILES
+# ============================================
+
+class UserProfileView(APIView):
+    """
+    Vista para gestionar el perfil del usuario actual
+    """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """
+        Obtener perfil del usuario actual
+        """
+        user = request.user
+        
+        # Asegurar que el perfil existe
+        profile, created = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                'timezone': 'America/Santiago',
+                'language': 'es'
+            }
+        )
+        
+        if created:
+            print(f"✅ Perfil creado para usuario existente: {user.username}")
+        
+        serializer = UserProfileSerializer(profile)
+        return Response(serializer.data)
+    
+    def put(self, request):
+        """
+        Actualizar perfil del usuario actual
+        """
+        user = request.user
+        
+        # Asegurar que el perfil existe
+        profile, created = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                'timezone': 'America/Santiago',
+                'language': 'es'
+            }
+        )
+        
+        serializer = UserProfileSerializer(profile, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Perfil actualizado correctamente',
+                'profile': serializer.data
+            })
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def patch(self, request):
+        """
+        Actualización parcial del perfil
+        """
+        return self.put(request)
+
+
+class UserProfileDetailView(generics.RetrieveUpdateAPIView):
+    """
+    Vista para ver y actualizar perfil de cualquier usuario de la organización
+    (solo para owners y admins)
+    """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserProfileSerializer
+    lookup_field = 'user_id'
+    
+    def get_queryset(self):
+        # Solo owners y admins pueden ver perfiles de otros usuarios
+        if self.request.user.role in ['owner', 'admin']:
+            return UserProfile.objects.filter(user__organization=self.request.user.organization)
+        else:
+            return UserProfile.objects.filter(user=self.request.user)
+    
+    def get_object(self):
+        user_id = self.kwargs.get('user_id')
+        
+        try:
+            user = User.objects.get(
+                id=user_id,
+                organization=self.request.user.organization
+            )
+        except User.DoesNotExist:
+            raise ValidationError("Usuario no encontrado")
+        
+        # Verificar permisos
+        if self.request.user.role not in ['owner', 'admin'] and user != self.request.user:
+            raise ValidationError("No tienes permisos para ver este perfil")
+        
+        # Asegurar que el perfil existe
+        profile, created = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                'timezone': 'America/Santiago',
+                'language': 'es'
+            }
+        )
+        
+        return profile
+
+
+class CurrentUserUpdateView(generics.UpdateAPIView):
+    """
+    Vista para que el usuario actual actualice su información básica y perfil
+    """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserUpdateSerializer
+    
+    def get_object(self):
+        return self.request.user
+    
+    def update(self, request, *args, **kwargs):
+        """
+        Actualizar información del usuario y su perfil
+        """
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        
+        if serializer.is_valid():
+            user = serializer.save()
+            
+            return Response({
+                'message': 'Información actualizada correctamente',
+                'user': UserSerializer(user).data
+            })
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
