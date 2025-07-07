@@ -2,9 +2,14 @@
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
+from django.db import models
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
+from core.pagination import CustomPageNumberPagination
 from plans.models import OrganizationSubscription
 from plans.serializers import SubscriptionUsageSerializer
 from .models import Organization, Professional, Service, Client
@@ -12,7 +17,9 @@ from .serializers import (
     OrganizationSerializer, 
     ProfessionalSerializer,
     ServiceSerializer,
-    ClientSerializer
+    ClientSerializer,
+    MarketplaceOrganizationSerializer,
+    MarketplaceOrganizationDetailSerializer
 )
 
 
@@ -204,3 +211,124 @@ class ClientViewSet(viewsets.ModelViewSet):
             })
         except OrganizationSubscription.DoesNotExist:
             return Response({'error': 'No subscription found'}, status=404)
+
+
+# ===== MARKETPLACE VIEWS =====
+
+class MarketplaceOrganizationListView(ListAPIView):
+    """
+    Vista pública para listar organizaciones en el marketplace
+    """
+    serializer_class = MarketplaceOrganizationSerializer
+    permission_classes = [AllowAny]
+    pagination_class = CustomPageNumberPagination
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    
+    # Filtros disponibles
+    filterset_fields = ['industry_template', 'city', 'country']
+    
+    # Búsqueda por texto
+    search_fields = ['name', 'description', 'services__name', 'professionals__name']
+    
+    # Ordenamiento
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
+    
+    def get_queryset(self):
+        """
+        Obtener organizaciones públicas (activas y con onboarding completo)
+        """
+        return Organization.objects.filter(
+            is_active=True,
+            onboarding_completed=True
+        ).prefetch_related('services', 'professionals')
+    
+    def get_serializer_context(self):
+        """Agregar contexto adicional"""
+        context = super().get_serializer_context()
+        context['marketplace'] = True
+        return context
+
+
+class MarketplaceOrganizationDetailView(RetrieveAPIView):
+    """
+    Vista pública para obtener detalles de una organización específica
+    """
+    serializer_class = MarketplaceOrganizationDetailSerializer
+    permission_classes = [AllowAny]
+    lookup_field = 'slug'
+    
+    def get_queryset(self):
+        """
+        Obtener organizaciones públicas (activas y con onboarding completo)
+        """
+        return Organization.objects.filter(
+            is_active=True,
+            onboarding_completed=True
+        ).prefetch_related(
+            'services__professionals',
+            'professionals'
+        )
+    
+    def get_serializer_context(self):
+        """Agregar contexto adicional"""
+        context = super().get_serializer_context()
+        context['marketplace'] = True
+        context['detailed'] = True
+        return context
+
+
+class MarketplaceStatsView(APIView):
+    """
+    Vista para obtener estadísticas del marketplace
+    """
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        """
+        Obtener estadísticas generales del marketplace
+        """
+        organizations = Organization.objects.filter(
+            is_active=True,
+            onboarding_completed=True
+        )
+        
+        # Contar por industria
+        industry_stats = {}
+        for choice in Organization.INDUSTRY_CHOICES:
+            industry_key = choice[0]
+            industry_name = choice[1]
+            count = organizations.filter(industry_template=industry_key).count()
+            if count > 0:
+                industry_stats[industry_key] = {
+                    'name': industry_name,
+                    'count': count
+                }
+        
+        # Contar por ciudad
+        city_stats = organizations.values('city').annotate(
+            count=models.Count('id')
+        ).order_by('-count')[:10]
+        
+        # Estadísticas generales
+        total_organizations = organizations.count()
+        total_services = Service.objects.filter(
+            organization__in=organizations,
+            is_active=True
+        ).count()
+        total_professionals = Professional.objects.filter(
+            organization__in=organizations,
+            is_active=True
+        ).count()
+        
+        return Response({
+            'total_organizations': total_organizations,
+            'total_services': total_services,
+            'total_professionals': total_professionals,
+            'industry_stats': industry_stats,
+            'city_stats': list(city_stats),
+            'latest_organizations': MarketplaceOrganizationSerializer(
+                organizations.order_by('-created_at')[:3],
+                many=True
+            ).data
+        })

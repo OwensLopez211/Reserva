@@ -15,7 +15,7 @@ urlpatterns = [
         path('auth/', include('users.urls')),
         
         # Planes y registro
-        path('', include('plans.urls')),
+        path('plans/', include('plans.urls')),
         
         # Core (onboarding)
         path('', include('core.urls')),

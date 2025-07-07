@@ -68,3 +68,27 @@ class SmallResultsSetPagination(PageNumberPagination):
             },
             'results': data
         })
+
+
+class CustomPageNumberPagination(PageNumberPagination):
+    """
+    Paginación personalizada para el marketplace
+    """
+    page_size = 12
+    page_size_query_param = 'page_size'
+    max_page_size = 48
+    
+    def get_paginated_response(self, data):
+        return Response({
+            'pagination': {
+                'next': self.get_next_link(),
+                'previous': self.get_previous_link(),
+                'count': self.page.paginator.count,
+                'total_pages': self.page.paginator.num_pages,
+                'current_page': self.page.number,
+                'page_size': self.get_page_size(self.request),
+                'has_next': self.page.has_next(),
+                'has_previous': self.page.has_previous(),
+            },
+            'results': data
+        })

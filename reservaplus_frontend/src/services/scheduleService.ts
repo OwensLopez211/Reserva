@@ -5,9 +5,6 @@ import {
   ProfessionalSchedule, 
   ScheduleData, 
   ScheduleOverview,
-  WeeklySchedule,
-  ScheduleException,
-  ScheduleBreak,
   ApiResponse 
 } from '../types/schedule';
 

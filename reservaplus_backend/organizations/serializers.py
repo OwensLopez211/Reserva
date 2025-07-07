@@ -240,3 +240,120 @@ class ClientSerializer(serializers.ModelSerializer):
         if instance.organization:
             representation['organization'] = str(instance.organization.id)
         return representation
+
+
+class MarketplaceServiceSerializer(serializers.ModelSerializer):
+    """
+    Serializer para servicios en el marketplace (información pública)
+    """
+    class Meta:
+        model = Service
+        fields = [
+            'id', 'name', 'description', 'category', 
+            'duration_minutes', 'price', 'is_active'
+        ]
+
+
+class MarketplaceProfessionalSerializer(serializers.ModelSerializer):
+    """
+    Serializer para profesionales en el marketplace (información pública)
+    """
+    class Meta:
+        model = Professional
+        fields = [
+            'id', 'name', 'specialty', 'bio', 'is_active'
+        ]
+
+
+class MarketplaceOrganizationSerializer(serializers.ModelSerializer):
+    """
+    Serializer para organizaciones en el marketplace (solo información pública)
+    """
+    services = MarketplaceServiceSerializer(many=True, read_only=True)
+    professionals = MarketplaceProfessionalSerializer(many=True, read_only=True)
+    services_count = serializers.SerializerMethodField()
+    professionals_count = serializers.SerializerMethodField()
+    min_price = serializers.SerializerMethodField()
+    max_price = serializers.SerializerMethodField()
+    is_open_now = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Organization
+        fields = [
+            'id', 'name', 'slug', 'description', 'industry_template',
+            'phone', 'website', 'address', 'city', 'country',
+            'logo', 'cover_image', 'gallery_images', 'is_featured',
+            'rating', 'total_reviews', 'services', 'professionals', 
+            'services_count', 'professionals_count', 'min_price', 
+            'max_price', 'is_open_now', 'created_at'
+        ]
+        read_only_fields = ['id', 'slug', 'created_at']
+    
+    def get_services_count(self, obj):
+        """Contar servicios activos"""
+        return obj.services.filter(is_active=True).count()
+    
+    def get_professionals_count(self, obj):
+        """Contar profesionales activos"""
+        return obj.professionals.filter(is_active=True).count()
+    
+    def get_min_price(self, obj):
+        """Obtener precio mínimo de servicios"""
+        services = obj.services.filter(is_active=True)
+        if services.exists():
+            return min(service.price for service in services)
+        return None
+    
+    def get_max_price(self, obj):
+        """Obtener precio máximo de servicios"""
+        services = obj.services.filter(is_active=True)
+        if services.exists():
+            return max(service.price for service in services)
+        return None
+    
+    def get_avg_rating(self, obj):
+        """Obtener rating promedio"""
+        return float(obj.rating) if obj.rating else 0.0
+    
+    def get_total_reviews(self, obj):
+        """Obtener total de reseñas"""
+        return obj.total_reviews
+    
+    def get_is_open_now(self, obj):
+        """Determinar si está abierto ahora"""
+        # TODO: Implementar lógica de horarios
+        from datetime import datetime
+        now = datetime.now()
+        # Placeholder: abierto de 9 AM a 6 PM
+        return 9 <= now.hour < 18
+
+
+class MarketplaceOrganizationDetailSerializer(MarketplaceOrganizationSerializer):
+    """
+    Serializer detallado para una organización específica en el marketplace
+    """
+    business_hours = serializers.SerializerMethodField()
+    featured_services = serializers.SerializerMethodField()
+    
+    class Meta(MarketplaceOrganizationSerializer.Meta):
+        fields = MarketplaceOrganizationSerializer.Meta.fields + [
+            'business_hours', 'featured_services'
+        ]
+    
+    def get_business_hours(self, obj):
+        """Obtener horarios de atención"""
+        # TODO: Implementar horarios desde settings
+        return {
+            'monday': {'open': '09:00', 'close': '18:00', 'closed': False},
+            'tuesday': {'open': '09:00', 'close': '18:00', 'closed': False},
+            'wednesday': {'open': '09:00', 'close': '18:00', 'closed': False},
+            'thursday': {'open': '09:00', 'close': '18:00', 'closed': False},
+            'friday': {'open': '09:00', 'close': '18:00', 'closed': False},
+            'saturday': {'open': '10:00', 'close': '16:00', 'closed': False},
+            'sunday': {'open': '10:00', 'close': '16:00', 'closed': True}
+        }
+    
+    def get_featured_services(self, obj):
+        """Obtener servicios destacados (top 3 por precio)"""
+        featured = obj.services.filter(is_active=True).order_by('-price')[:3]
+        return MarketplaceServiceSerializer(featured, many=True).data

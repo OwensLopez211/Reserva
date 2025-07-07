@@ -11,8 +11,29 @@ from .serializers import (
     PlanPublicSerializer, 
     UserRegistrationCreateSerializer,
     UserRegistrationSerializer,
-    SubscriptionUsageSerializer
+    SubscriptionUsageSerializer,
+    OrganizationSubscriptionSerializer
 )
+
+
+class HealthCheckView(APIView):
+    """
+    Vista de verificación para comprobar que las URLs funcionan
+    """
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        return Response({
+            'status': 'OK',
+            'message': 'Plans API is working correctly',
+            'endpoints': [
+                '/api/plans/health/',
+                '/api/plans/subscription/me/',
+                '/api/plans/subscription/me/usage/',
+                '/api/plans/plans/'
+            ],
+            'timestamp': timezone.now()
+        })
 
 
 class PlanViewSet(viewsets.ReadOnlyModelViewSet):
@@ -133,13 +154,55 @@ class RegistrationStatusView(APIView):
 
 class MySubscriptionView(APIView):
     """
-    Vista para obtener información de la suscripción del usuario actual
+    Vista para obtener información completa de la suscripción del usuario actual
     """
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
         """
-        Obtener suscripción del usuario actual
+        Obtener suscripción completa del usuario actual
+        """
+        user = request.user
+        print(f"DEBUG: Usuario autenticado: {user.username}")
+        print(f"DEBUG: Organización del usuario: {user.organization}")
+        
+        if not user.organization:
+            return Response({
+                'error': 'Usuario no pertenece a ninguna organización',
+                'debug': {
+                    'user': user.username,
+                    'organization': None
+                }
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            subscription = OrganizationSubscription.objects.select_related('plan', 'organization').get(
+                organization=user.organization
+            )
+            print(f"DEBUG: Suscripción encontrada: {subscription.plan.name}")
+            serializer = OrganizationSubscriptionSerializer(subscription)
+            return Response(serializer.data)
+            
+        except OrganizationSubscription.DoesNotExist:
+            print(f"DEBUG: No se encontró suscripción para organización: {user.organization.name}")
+            return Response({
+                'error': 'No se encontró suscripción activa',
+                'debug': {
+                    'organization': user.organization.name,
+                    'organization_id': str(user.organization.id)
+                }
+            }, status=status.HTTP_404_NOT_FOUND)
+
+
+class MySubscriptionUsageView(APIView):
+    """
+    Vista para obtener información de uso de la suscripción del usuario actual
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """
+        Obtener uso actual de la suscripción
         """
         user = request.user
         if not user.organization:
@@ -148,7 +211,7 @@ class MySubscriptionView(APIView):
             }, status=status.HTTP_404_NOT_FOUND)
         
         try:
-            subscription = OrganizationSubscription.objects.get(
+            subscription = OrganizationSubscription.objects.select_related('plan').get(
                 organization=user.organization
             )
             serializer = SubscriptionUsageSerializer(subscription)

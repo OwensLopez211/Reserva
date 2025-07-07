@@ -29,10 +29,10 @@ const Footer: React.FC<FooterProps> = ({ variant = 'modern' }) => {
 
   const footerLinks = {
     product: [
+      { name: 'Marketplace', href: '/marketplace' },
       { name: 'Características', href: '/features' },
       { name: 'Precios', href: '/pricing' },
-      { name: 'Demo', href: '/demo' },
-      { name: 'Casos de Uso', href: '/use-cases' }
+      { name: 'Demo', href: '/demo' }
     ],
     company: [
       { name: 'Acerca de', href: '/about' },

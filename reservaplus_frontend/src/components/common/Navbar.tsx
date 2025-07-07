@@ -1,7 +1,7 @@
 // src/components/common/Navbar.tsx - CON TRANSICIONES INTEGRADAS
 import React, { useState, useEffect, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Calendar, Shield, Users, Phone, ArrowUp } from 'lucide-react'
+import { Calendar, Shield, ArrowUp, Store, DollarSign } from 'lucide-react'
 import { useTransition } from '../../contexts/TransitionContext'
 
 const Navbar: React.FC = () => {
@@ -23,6 +23,12 @@ const Navbar: React.FC = () => {
       description: 'Página principal'
     },
     { 
+      name: 'Marketplace', 
+      href: '/marketplace', 
+      icon: Store,
+      description: 'Encuentra servicios y profesionales'
+    },
+    { 
       name: 'Características', 
       href: '/features', 
       icon: Shield,
@@ -31,14 +37,8 @@ const Navbar: React.FC = () => {
     { 
       name: 'Precios', 
       href: '/pricing', 
-      icon: Users,
+      icon: DollarSign,
       description: 'Planes y tarifas'
-    },
-    { 
-      name: 'Contacto', 
-      href: '/contact', 
-      icon: Phone,
-      description: 'Ponte en contacto'
     },
   ]
 

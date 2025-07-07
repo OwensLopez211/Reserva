@@ -41,6 +41,29 @@ class Organization(models.Model):
     phone = models.CharField(max_length=20, blank=True)
     website = models.URLField(blank=True)
     
+    # ===== CAMPOS PARA MARKETPLACE =====
+    logo = models.URLField(blank=True, help_text="URL del logo de la organización")
+    cover_image = models.URLField(blank=True, help_text="URL de la imagen de portada")
+    gallery_images = models.JSONField(
+        default=list, 
+        blank=True,
+        help_text="Lista de URLs de imágenes para la galería"
+    )
+    is_featured = models.BooleanField(
+        default=False,
+        help_text="Aparece en la sección de destacados del marketplace"
+    )
+    rating = models.DecimalField(
+        max_digits=3, 
+        decimal_places=2, 
+        default=0.0,
+        help_text="Rating promedio basado en reseñas"
+    )
+    total_reviews = models.PositiveIntegerField(
+        default=0,
+        help_text="Número total de reseñas"
+    )
+    
     # Dirección
     address = models.TextField(blank=True, verbose_name="Dirección")
     city = models.CharField(max_length=100, blank=True, verbose_name="Ciudad")

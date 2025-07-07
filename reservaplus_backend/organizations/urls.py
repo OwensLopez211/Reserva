@@ -16,4 +16,9 @@ urlpatterns = [
     
     # Router URLs
     path('', include(router.urls)),
+    
+    # ===== MARKETPLACE URLS (PÚBLICAS) =====
+    path('marketplace/', views.MarketplaceOrganizationListView.as_view(), name='marketplace-list'),
+    path('marketplace/<slug:slug>/', views.MarketplaceOrganizationDetailView.as_view(), name='marketplace-detail'),
+    path('marketplace/stats/', views.MarketplaceStatsView.as_view(), name='marketplace-stats'),
 ]

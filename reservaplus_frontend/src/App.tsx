@@ -9,11 +9,16 @@ import { OnboardingGuard } from './components/onboarding/OnboardingGuard'
 import { OnboardingNavigator } from './components/onboarding/OnboardingNavigator'
 import PublicLayout from './components/layouts/PublicLayout'
 import PrivateLayout from './components/layouts/PrivateLayout'
+import MarketplaceLayout from './components/layouts/MarketplaceLayout'
 
 // Páginas públicas
 import HomePage from './pages/public/HomePage'
 import { FeaturesPage } from './pages/public/FeaturesPage'
 import { PricingPage } from './pages/public/PricingPage'
+
+// Páginas del marketplace
+import MarketplaceHomePage from './pages/marketplace/MarketplaceHomePage'
+import OrganizationProfilePage from './pages/marketplace/OrganizationProfilePage'
 
 // Páginas de autenticación
 import LoginLayout from './components/layouts/LoginLayout'
@@ -33,6 +38,8 @@ import TeamPage from './pages/team/TeamPage'
 import SchedulesPage from './pages/SchedulesPage'
 import ServicesPage from './pages/ServicesPage'
 import SettingsPage from './pages/SettingsPage'
+import ProfilePage from './pages/ProfilePage'
+import SubscriptionPage from './pages/SubscriptionPage'
 
 import './App.css'
 
@@ -70,19 +77,7 @@ const ClientsPage = () => (
 
 
 
-const ProfilePage = () => (
-  <div className="animate-fadeIn">
-    <h1 className="text-3xl font-bold text-gray-900">Mi Perfil</h1>
-    <p className="mt-4 text-gray-600">Gestiona tu información personal</p>
-  </div>
-)
 
-const SubscriptionPage = () => (
-  <div className="animate-fadeIn">
-    <h1 className="text-3xl font-bold text-gray-900">Suscripción</h1>
-    <p className="mt-4 text-gray-600">Gestiona tu plan y facturación</p>
-  </div>
-)
 
 // Páginas de reportes
 const SalesReportPage = () => (
@@ -336,6 +331,19 @@ function App() {
                   <Route path="privacy" element={<PrivacyPage />} />
                   <Route path="terms" element={<TermsPage />} />
                   <Route path="help" element={<HelpPage />} />
+                </Route>
+
+                {/* Rutas del marketplace */}
+                <Route path="/marketplace" element={<MarketplaceLayout />}>
+                  <Route index element={<MarketplaceHomePage />} />
+                  <Route path="org/:slug" element={<OrganizationProfilePage />} />
+                  <Route path="org/:slug/booking" element={<div>Página de reserva en desarrollo</div>} />
+                  <Route path="categories" element={<div>Categorías en desarrollo</div>} />
+                  <Route path="featured" element={<div>Destacados en desarrollo</div>} />
+                  <Route path="category/:category" element={<div>Categoría específica en desarrollo</div>} />
+                  <Route path="how-it-works" element={<div>Cómo funciona en desarrollo</div>} />
+                  <Route path="for-business" element={<div>Para negocios en desarrollo</div>} />
+                  <Route path="help" element={<div>Ayuda del marketplace en desarrollo</div>} />
                 </Route>
 
                 {/* Login fuera del layout público */}
