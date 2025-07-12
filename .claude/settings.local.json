@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python manage.py:*)",
+      "Bash(python3 manage.py check:*)",
+      "Bash(python3:*)",
+      "Bash(rm:*)",
+      "Bash(find:*)",
+      "Bash(python test:*)",
+      "Bash(source:*)",
+      "Bash(sqlite3:*)",
+      "Bash(npm run build:*)",
+      "Bash(grep:*)",
+      "Bash(npm run type-check:*)"
+    ],
+    "deny": []
+  }
+}

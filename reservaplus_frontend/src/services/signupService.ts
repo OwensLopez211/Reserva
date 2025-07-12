@@ -46,7 +46,7 @@ export class SignupService {
    */
   static async startSignup(data: SignupData): Promise<SignupResponse> {
     try {
-      const response = await api.post('/api/signup/', data)
+      const response = await api.post('/api/plans/signup/', data)
       return response.data
     } catch (error: unknown) {
       console.error('Error en signup:', error)
@@ -67,7 +67,7 @@ export class SignupService {
    */
   static async getRegistrationStatus(token: string): Promise<RegistrationStatus> {
     try {
-      const response = await api.get(`/api/registration/${token}/`)
+      const response = await api.get(`/api/plans/registration/${token}/`)
       return response.data
     } catch (error) {
       console.error('Error al verificar registro:', error)
@@ -84,7 +84,7 @@ export class SignupService {
     completedSteps: number[]
   ): Promise<RegistrationStatus> {
     try {
-      const response = await api.patch(`/api/registration/${token}/`, {
+      const response = await api.patch(`/api/plans/registration/${token}/`, {
         step,
         completed_steps: completedSteps
       })
@@ -100,7 +100,7 @@ export class SignupService {
    */
   static async getAvailablePlans() {
     try {
-      const response = await api.get('/api/plans/')
+      const response = await api.get('/api/plans/plans/')
       return response.data
     } catch (error) {
       console.error('Error al obtener planes:', error)

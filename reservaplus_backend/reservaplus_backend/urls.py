@@ -32,6 +32,9 @@ urlpatterns = [
         # API Rest Framework (para navegación)
         path('', include('rest_framework.urls')),
     ])),
+    
+    # Public booking endpoints (sin prefijo /api/)
+    path('public/booking/', include('appointments.public_urls')),
 ]
 
 # Servir archivos media en desarrollo

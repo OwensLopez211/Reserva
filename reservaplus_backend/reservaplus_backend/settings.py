@@ -35,6 +35,7 @@ LOCAL_APPS = [
     'notifications',
     'plans',
     'schedule',
+    'onboarding',  # Nuevo módulo de onboarding
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -94,7 +95,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',  # Fallback
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     ],
     'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardResultsSetPagination',
     'PAGE_SIZE': 20,

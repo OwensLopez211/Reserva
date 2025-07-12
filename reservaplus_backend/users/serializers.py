@@ -74,10 +74,10 @@ class UserSerializer(serializers.ModelSerializer):
 
 class UserCreateSerializer(serializers.ModelSerializer):
     """
-    Serializer para crear usuarios (incluye password)
+    Serializer para crear usuarios (genera contraseña automáticamente)
     """
-    password = serializers.CharField(write_only=True, min_length=6)
-    confirm_password = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True, min_length=6, required=False)
+    confirm_password = serializers.CharField(write_only=True, required=False)
     
     class Meta:
         model = User
@@ -89,23 +89,40 @@ class UserCreateSerializer(serializers.ModelSerializer):
     
     def validate(self, data):
         """
-        Validar que las contraseñas coincidan
+        Validar que las contraseñas coincidan si se proporcionan
         """
-        if data['password'] != data['confirm_password']:
-            raise serializers.ValidationError("Las contraseñas no coinciden")
+        password = data.get('password')
+        confirm_password = data.get('confirm_password')
+        
+        if password and confirm_password:
+            if password != confirm_password:
+                raise serializers.ValidationError("Las contraseñas no coinciden")
+        
         return data
     
     def create(self, validated_data):
         """
         Crear usuario con contraseña encriptada
-        El perfil se creará automáticamente mediante signals
+        Si no se proporciona contraseña, se genera automáticamente
         """
-        validated_data.pop('confirm_password')
-        password = validated_data.pop('password')
+        import secrets
+        import string
+        
+        validated_data.pop('confirm_password', None)
+        password = validated_data.pop('password', None)
+        
+        # Generar contraseña aleatoria si no se proporciona
+        if not password:
+            alphabet = string.ascii_letters + string.digits
+            password = ''.join(secrets.choice(alphabet) for _ in range(12))
         
         user = User.objects.create(**validated_data)
         user.set_password(password)
         user.save()
+        
+        # Guardar contraseña temporal para envío por correo (futuro)
+        user.temp_password = password
+        
         return user
 
 

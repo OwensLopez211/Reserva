@@ -12,6 +12,9 @@ class User(AbstractUser):
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     
+    # Email único en toda la plataforma
+    email = models.EmailField(unique=True, help_text="Email único en toda la plataforma")
+    
     # Relación con organización (multi-tenant)
     organization = models.ForeignKey(
         'organizations.Organization', 
@@ -39,6 +42,10 @@ class User(AbstractUser):
     
     # Campo para almacenar last_login en hora local de Chile (como string)
     last_login_local = models.CharField(max_length=50, null=True, blank=True, help_text="Último login en hora local de Chile")
+    
+    # Campo para contraseña temporal (para envío por correo)
+    temp_password = models.CharField(max_length=255, null=True, blank=True, help_text="Contraseña temporal generada automáticamente")
+    requires_password_change = models.BooleanField(default=False, help_text="Requiere cambio de contraseña en el siguiente login")
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)

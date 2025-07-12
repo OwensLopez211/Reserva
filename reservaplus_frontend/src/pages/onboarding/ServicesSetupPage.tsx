@@ -18,7 +18,8 @@ const ServicesSetupPage: React.FC = () => {
     canProceedFromStep,
     completeOnboarding,
     isCompleting,
-    registrationToken
+    registrationToken,
+    professionals
   } = useOnboarding()
   
   const [isLoading, setIsLoading] = useState(false)
@@ -33,7 +34,16 @@ const ServicesSetupPage: React.FC = () => {
       return
     }
     // NO cargar servicios automáticamente - el usuario debe elegir
-  }, [registrationToken, navigate])
+    
+    // Log para ver el estado del contexto al cargar
+    console.log('🔍 ServicesSetupPage cargado - Estado del contexto:', {
+      organizationData,
+      professionals: professionals.length,
+      professionalDetails: professionals,
+      services: services.length,
+      registrationToken: !!registrationToken
+    })
+  }, [registrationToken, navigate, organizationData, professionals, services])
 
   const getIndustryTerms = () => {
     const terms: {[key: string]: {service: string, services: string}} = {
@@ -163,6 +173,14 @@ const ServicesSetupPage: React.FC = () => {
     setIsLoading(true)
     try {
       console.log('🎯 Iniciando finalización del onboarding...')
+      console.log('📊 Estado actual del contexto:', {
+        organizationData,
+        professionals: professionals.length,
+        professionalDetails: professionals,
+        services: services.length,
+        serviceDetails: services,
+        registrationToken
+      })
       
       // Completar el onboarding (esto llama al backend)
       await completeOnboarding()

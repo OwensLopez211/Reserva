@@ -20,6 +20,10 @@ import { PricingPage } from './pages/public/PricingPage'
 import MarketplaceHomePage from './pages/marketplace/MarketplaceHomePage'
 import OrganizationProfilePage from './pages/marketplace/OrganizationProfilePage'
 
+// Páginas de reservas públicas
+import PublicOrganizationProfilePage from './pages/public/OrganizationProfilePage'
+import AppointmentStatusPage from './pages/public/AppointmentStatusPage'
+
 // Páginas de autenticación
 import LoginLayout from './components/layouts/LoginLayout'
 
@@ -34,6 +38,7 @@ import ServicesSetupPage from './pages/onboarding/ServicesSetupPage'
 // Páginas privadas
 import RoleDashboard from './components/dashboard/RoleDashboard'
 import CalendarPage from './pages/calendar/CalendarPage'
+import ClientsPage from './pages/ClientsPage'
 import TeamPage from './pages/team/TeamPage'
 import SchedulesPage from './pages/SchedulesPage'
 import ServicesPage from './pages/ServicesPage'
@@ -66,12 +71,7 @@ const RemindersPage = () => (
   </div>
 )
 
-const ClientsPage = () => (
-  <div className="animate-fadeIn">
-    <h1 className="text-3xl font-bold text-gray-900">Clientes</h1>
-    <p className="mt-4 text-gray-600">Gestiona tu base de clientes</p>
-  </div>
-)
+// ClientsPage now imported from real file
 
 // TeamPage ahora se importa desde el archivo real
 
@@ -331,19 +331,26 @@ function App() {
                   <Route path="privacy" element={<PrivacyPage />} />
                   <Route path="terms" element={<TermsPage />} />
                   <Route path="help" element={<HelpPage />} />
+                  {/* Rutas de reservas públicas */}
+                  <Route path="appointment/:id" element={<AppointmentStatusPage />} />
                 </Route>
 
                 {/* Rutas del marketplace */}
                 <Route path="/marketplace" element={<MarketplaceLayout />}>
                   <Route index element={<MarketplaceHomePage />} />
                   <Route path="org/:slug" element={<OrganizationProfilePage />} />
-                  <Route path="org/:slug/booking" element={<div>Página de reserva en desarrollo</div>} />
+                  <Route path="org/:slug/booking" element={<OrganizationProfilePage />} />
                   <Route path="categories" element={<div>Categorías en desarrollo</div>} />
                   <Route path="featured" element={<div>Destacados en desarrollo</div>} />
                   <Route path="category/:category" element={<div>Categoría específica en desarrollo</div>} />
                   <Route path="how-it-works" element={<div>Cómo funciona en desarrollo</div>} />
                   <Route path="for-business" element={<div>Para negocios en desarrollo</div>} />
                   <Route path="help" element={<div>Ayuda del marketplace en desarrollo</div>} />
+                </Route>
+
+                {/* Public booking routes - under marketplace layout */}
+                <Route path="/book" element={<MarketplaceLayout />}>
+                  <Route path=":slug" element={<PublicOrganizationProfilePage />} />
                 </Route>
 
                 {/* Login fuera del layout público */}

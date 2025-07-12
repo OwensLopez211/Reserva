@@ -1,8 +1,8 @@
-// src/services/onboardingService.ts - VERSIÓN CORREGIDA Y ALINEADA
+// src/services/onboardingService.ts - VERSIÓN ALINEADA CON BACKEND REFACTORIZADO
 
 import { api } from './api'
 
-// Interfaces que coinciden con el backend
+// Interfaces que coinciden exactamente con el backend refactorizado
 export interface OnboardingCompleteData {
   registration_token: string
   organization: {
@@ -122,7 +122,7 @@ export class OnboardingService {
       }
 
       console.log('🚀 Iniciando signup:', signupData)
-      const response = await api.post('/api/signup/', signupData)
+      const response = await api.post('/api/plans/signup/', signupData)
       
       console.log('✅ Signup exitoso:', response.data)
       
@@ -144,15 +144,16 @@ export class OnboardingService {
   }
 
   /**
-   * PASO 2: Completar todo el onboarding de una vez
+   * PASO 2: Completar todo el onboarding usando el endpoint refactorizado
    */
   static async completeOnboarding(data: OnboardingCompleteData): Promise<OnboardingCompleteResponse> {
     try {
-      console.log('🔄 Completando onboarding con datos:', JSON.stringify(data, null, 2))
+      console.log('🔄 Completando onboarding con endpoint refactorizado:', JSON.stringify(data, null, 2))
       
+      // Usar el endpoint refactorizado
       const response = await api.post('/api/onboarding/complete/', data)
       
-      console.log('✅ Onboarding completado:', response.data)
+      console.log('✅ Onboarding completado exitosamente:', response.data)
       
       // Limpiar datos temporales
       localStorage.removeItem('registration_token')
@@ -186,6 +187,7 @@ export class OnboardingService {
           })
         }
         
+        // Manejo específico de errores del backend refactorizado
         if (errObj.response?.data?.error) {
           throw new Error(errObj.response.data.error)
         }
@@ -197,9 +199,9 @@ export class OnboardingService {
         if (errObj.response?.status === 400) {
           const details = errObj.response.data?.details
           if (details) {
-            throw new Error(`Datos inválidos: ${JSON.stringify(details, null, 2)}`)
+            throw new Error(`Error de validación: ${JSON.stringify(details, null, 2)}`)
           } else {
-            throw new Error(`Error 400: ${JSON.stringify(errObj.response.data, null, 2)}`)
+            throw new Error(`Datos inválidos: ${JSON.stringify(errObj.response.data, null, 2)}`)
           }
         }
         
@@ -211,6 +213,10 @@ export class OnboardingService {
           throw new Error('No tienes permisos para realizar esta acción')
         }
         
+        if (errObj.response?.status === 429) {
+          throw new Error('Demasiados intentos. Por favor, espera un momento antes de intentar nuevamente.')
+        }
+        
         if (errObj.response?.status === 500) {
           throw new Error('Error interno del servidor. Por favor, intenta más tarde.')
         }
@@ -219,6 +225,58 @@ export class OnboardingService {
       }
       
       throw new Error('Error de conexión al completar el onboarding')
+    }
+  }
+
+  /**
+   * Validar datos antes de enviar al backend
+   */
+  static async validateOnboarding(data: OnboardingCompleteData): Promise<{
+    is_valid: boolean
+    errors?: string[]
+  }> {
+    try {
+      console.log('🔍 Validando datos de onboarding...')
+      
+      // Usar el endpoint de validación del backend refactorizado
+      const response = await api.post('/api/onboarding/validate/', data)
+      
+      console.log('✅ Validación exitosa:', response.data)
+      return response.data
+    } catch (error: unknown) {
+      console.error('❌ Error en validación:', error)
+      
+      if (typeof error === 'object' && error !== null && 'response' in error) {
+        const errObj = error as { 
+          response?: { 
+            data?: { 
+              is_valid?: boolean
+              errors?: string[]
+              error?: string
+            }
+            status?: number
+          } 
+        }
+        
+        if (errObj.response?.data?.is_valid !== undefined) {
+          return {
+            is_valid: errObj.response.data.is_valid,
+            errors: errObj.response.data.errors || []
+          }
+        }
+        
+        if (errObj.response?.data?.error) {
+          return {
+            is_valid: false,
+            errors: [errObj.response.data.error]
+          }
+        }
+      }
+      
+      return {
+        is_valid: false,
+        errors: ['Error al validar los datos']
+      }
     }
   }
 
@@ -235,11 +293,11 @@ export class OnboardingService {
     expires_at?: string
   }> {
     try {
-      const response = await api.get(`/api/registration/${token}/`)
+      const response = await api.get(`/api/plans/registration/${token}/`)
       return response.data
     } catch (error) {
-      console.error('Error verificando token:', error)
-      return { is_valid: false }
+      console.error('Error verificando estado de registro:', error)
+      throw new Error('Error al verificar el estado del registro')
     }
   }
 
@@ -269,7 +327,7 @@ export class OnboardingService {
    */
   static async getAvailablePlans() {
     try {
-      const response = await api.get('/api/plans/')
+      const response = await api.get('/api/plans/plans/')
       return response.data
     } catch (error) {
       console.error('Error obteniendo planes:', error)
@@ -323,6 +381,17 @@ export class OnboardingService {
           buffer_time_after: 5,
           is_active: true,
           requires_preparation: false
+        },
+        {
+          name: 'Tratamiento Capilar',
+          description: 'Tratamiento nutritivo para el cabello',
+          category: 'Tratamientos',
+          duration_minutes: 60,
+          price: 25000,
+          buffer_time_before: 5,
+          buffer_time_after: 10,
+          is_active: true,
+          requires_preparation: true
         }
       ],
       clinic: [
@@ -345,6 +414,74 @@ export class OnboardingService {
           buffer_time_after: 5,
           is_active: true,
           requires_preparation: false
+        },
+        {
+          name: 'Examen Físico',
+          description: 'Examen físico completo',
+          category: 'Exámenes',
+          duration_minutes: 45,
+          price: 30000,
+          buffer_time_before: 10,
+          buffer_time_after: 15,
+          is_active: true,
+          requires_preparation: true
+        }
+      ],
+      spa: [
+        {
+          name: 'Masaje Relajante',
+          description: 'Masaje corporal completo',
+          category: 'Masajes',
+          duration_minutes: 60,
+          price: 35000,
+          buffer_time_before: 10,
+          buffer_time_after: 15,
+          is_active: true,
+          requires_preparation: true
+        },
+        {
+          name: 'Limpieza Facial',
+          description: 'Limpieza facial profunda',
+          category: 'Faciales',
+          duration_minutes: 75,
+          price: 28000,
+          buffer_time_before: 10,
+          buffer_time_after: 10,
+          is_active: true,
+          requires_preparation: true
+        },
+        {
+          name: 'Manicure',
+          description: 'Cuidado completo de manos',
+          category: 'Manos',
+          duration_minutes: 45,
+          price: 15000,
+          buffer_time_after: 5,
+          is_active: true,
+          requires_preparation: false
+        }
+      ],
+      gym: [
+        {
+          name: 'Entrenamiento Personal',
+          description: 'Sesión de entrenamiento personalizado',
+          category: 'Entrenamiento',
+          duration_minutes: 60,
+          price: 20000,
+          buffer_time_before: 5,
+          buffer_time_after: 10,
+          is_active: true,
+          requires_preparation: false
+        },
+        {
+          name: 'Clase Grupal',
+          description: 'Clase de entrenamiento grupal',
+          category: 'Clases',
+          duration_minutes: 45,
+          price: 8000,
+          buffer_time_after: 5,
+          is_active: true,
+          requires_preparation: false
         }
       ]
     }
@@ -353,7 +490,7 @@ export class OnboardingService {
   }
 
   /**
-   * Validar datos del onboarding antes de enviar
+   * Validar datos del onboarding localmente (validación rápida)
    */
   static validateOnboardingData(data: {
     organization: {
@@ -379,6 +516,8 @@ export class OnboardingService {
     }
     if (!data.organization?.email?.trim()) {
       errors.push('El email de la organización es requerido')
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.organization.email)) {
+      errors.push('El email de la organización no es válido')
     }
     if (!data.organization?.phone?.trim()) {
       errors.push('El teléfono de la organización es requerido')
@@ -395,6 +534,8 @@ export class OnboardingService {
       }
       if (!prof.email?.trim()) {
         errors.push(`Email del profesional ${index + 1} es requerido`)
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(prof.email)) {
+        errors.push(`Email del profesional ${index + 1} no es válido`)
       }
     })
 
@@ -433,5 +574,22 @@ export class OnboardingService {
     localStorage.removeItem('signup_data')
     localStorage.removeItem('onboarding_progress')
     localStorage.removeItem('plan_selection')
+  }
+
+  /**
+   * Obtener estado de salud del servicio de onboarding
+   */
+  static async getHealthStatus(): Promise<{
+    status: string
+    message: string
+    timestamp: string
+  }> {
+    try {
+      const response = await api.get('/api/onboarding/health/')
+      return response.data
+    } catch (error) {
+      console.error('Error obteniendo estado de salud:', error)
+      throw new Error('Error al verificar el estado del servicio')
+    }
   }
 }

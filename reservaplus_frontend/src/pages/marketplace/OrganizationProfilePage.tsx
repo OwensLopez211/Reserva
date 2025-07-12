@@ -1,533 +1,487 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { 
-  MapPin, Star, Clock, Phone, Globe, Calendar, 
-  ArrowLeft, Share2, Heart, CheckCircle,
-  ChevronLeft, ChevronRight
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import {
+  Star,
+  MapPin,
+  Phone,
+  Mail,
+  Globe,
+  Clock,
+  Users,
+  Calendar,
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  User,
+  Scissors
 } from 'lucide-react'
-
-interface Organization {
-  id: string
-  name: string
-  slug: string
-  description: string
-  category: string
-  location: string
-  address: string
-  phone: string
-  website: string
-  rating: number
-  reviewCount: number
-  images: string[]
-  services: { name: string; price: string; duration: string }[]
-  hours: { [key: string]: string }
-  featured: boolean
-  open_now: boolean
-  next_available: string
-  features: string[]
-  team: { name: string; role: string; image: string }[]
-}
-
-interface Review {
-  id: string
-  user: string
-  rating: number
-  comment: string
-  date: string
-  service: string
-}
+import publicBookingService, { 
+  PublicOrganizationDetail, 
+  PublicService, 
+  PublicProfessional 
+} from '../../services/publicBookingService'
+import BookingModal from '../../components/public/BookingModal'
 
 const OrganizationProfilePage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>()
-  const [organization, setOrganization] = useState<Organization | null>(null)
-  const [reviews, setReviews] = useState<Review[]>([])
+  const navigate = useNavigate()
+  const location = useLocation()
+  
+  const [organizationData, setOrganizationData] = useState<PublicOrganizationDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'reviews' | 'team'>('overview')
-
-  // Datos de ejemplo
-  const sampleOrganization: Organization = {
-    id: '1',
-    name: 'Salón Bella Vista',
-    slug: 'salon-bella-vista',
-    description: 'Especialistas en coloración y cortes modernos con más de 10 años de experiencia en el sector. Nuestro equipo de profesionales certificados te ofrece los últimos tratamientos y técnicas de peluquería.',
-    category: 'Belleza',
-    location: 'Providencia, Santiago',
-    address: 'Av. Providencia 1234, Providencia, Santiago',
-    phone: '+56 9 1234 5678',
-    website: 'https://salonbellavista.cl',
-    rating: 4.8,
-    reviewCount: 127,
-    images: [
-      'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800',
-      'https://images.unsplash.com/photo-1562322140-8baeececf3df?w=800',
-      'https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?w=800'
-    ],
-    services: [
-      { name: 'Corte y Lavado', price: '$15.000', duration: '45 min' },
-      { name: 'Coloración Completa', price: '$45.000', duration: '2h 30min' },
-      { name: 'Mechas', price: '$35.000', duration: '2h' },
-      { name: 'Tratamiento Capilar', price: '$25.000', duration: '1h' },
-      { name: 'Peinado para Eventos', price: '$20.000', duration: '1h' }
-    ],
-    hours: {
-      'Lunes': '9:00 - 19:00',
-      'Martes': '9:00 - 19:00',
-      'Miércoles': '9:00 - 19:00',
-      'Jueves': '9:00 - 20:00',
-      'Viernes': '9:00 - 20:00',
-      'Sábado': '9:00 - 18:00',
-      'Domingo': 'Cerrado'
-    },
-    featured: true,
-    open_now: true,
-    next_available: 'Hoy 14:30',
-    features: [
-      'Wi-Fi gratuito',
-      'Estacionamiento',
-      'Productos orgánicos',
-      'Tarjetas de crédito',
-      'Cita online',
-      'Certificación ISO'
-    ],
-    team: [
-      { name: 'María González', role: 'Directora y Colorista', image: 'https://images.unsplash.com/photo-1494790108755-2616b612b2c5?w=150' },
-      { name: 'Carlos Silva', role: 'Estilista Senior', image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150' },
-      { name: 'Ana López', role: 'Especialista en Tratamientos', image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150' }
-    ]
-  }
-
-  const sampleReviews: Review[] = [
-    {
-      id: '1',
-      user: 'Fernanda M.',
-      rating: 5,
-      comment: 'Excelente servicio, María es increíble con los colores. El resultado superó mis expectativas.',
-      date: '2024-01-15',
-      service: 'Coloración Completa'
-    },
-    {
-      id: '2',
-      user: 'Roberto P.',
-      rating: 5,
-      comment: 'Muy profesional, puntual y el corte quedó perfecto. Definitivamente volveré.',
-      date: '2024-01-10',
-      service: 'Corte y Lavado'
-    },
-    {
-      id: '3',
-      user: 'Laura T.',
-      rating: 4,
-      comment: 'Buen servicio en general, aunque tuve que esperar un poco más de lo esperado.',
-      date: '2024-01-08',
-      service: 'Mechas'
-    }
-  ]
+  const [error, setError] = useState<string | null>(null)
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  const [selectedService, setSelectedService] = useState<PublicService | null>(null)
+  const [selectedProfessional, setSelectedProfessional] = useState<PublicProfessional | null>(null)
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<'services' | 'professionals' | 'about'>('services')
 
   useEffect(() => {
-    // Simular carga de datos
-    const loadOrganization = async () => {
+    if (slug) {
+      loadOrganizationData()
+    }
+  }, [slug])
+
+  // Detectar si estamos en la ruta de booking y abrir el modal automáticamente
+  useEffect(() => {
+    if (location.pathname.includes('/booking') && organizationData) {
+      // Abrir el modal de booking automáticamente con el primer servicio
+      const firstService = Object.values(organizationData.services_by_category)[0]?.[0]
+      if (firstService) {
+        handleBookService(firstService)
+      }
+    }
+  }, [location.pathname, organizationData])
+
+  const loadOrganizationData = async () => {
+    if (!slug) return
+    
+    try {
       setLoading(true)
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      setOrganization(sampleOrganization)
-      setReviews(sampleReviews)
+      setError(null)
+      const data = await publicBookingService.getOrganizationDetail(slug)
+      setOrganizationData(data)
+      
+      // Expandir todas las categorías por defecto
+      const categories = Object.keys(data.services_by_category)
+      setExpandedCategories(new Set(categories))
+    } catch (error) {
+      console.error('Error loading organization data:', error)
+      setError('Error al cargar los datos de la organización')
+    } finally {
       setLoading(false)
     }
+  }
 
-    loadOrganization()
-  }, [slug])
+  const toggleCategory = (category: string) => {
+    const newExpanded = new Set(expandedCategories)
+    if (newExpanded.has(category)) {
+      newExpanded.delete(category)
+    } else {
+      newExpanded.add(category)
+    }
+    setExpandedCategories(newExpanded)
+  }
+
+  const handleBookService = (service: PublicService, professional?: PublicProfessional) => {
+    setSelectedService(service)
+    setSelectedProfessional(professional || null)
+    setIsBookingModalOpen(true)
+  }
+
+  const handleBookingSuccess = () => {
+    setIsBookingModalOpen(false)
+    setSelectedService(null)
+    setSelectedProfessional(null)
+    // Aquí podrías mostrar una notificación de éxito
+  }
+
+  const handleCloseModal = () => {
+    setIsBookingModalOpen(false)
+    setSelectedService(null)
+    setSelectedProfessional(null)
+  }
+
+  const renderRating = (rating: number, totalReviews: number) => {
+    const stars = []
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <Star
+          key={i}
+          className={`h-4 w-4 ${
+            i <= rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
+          }`}
+        />
+      )
+    }
+    return (
+      <div className="flex items-center space-x-1">
+        <div className="flex space-x-1">{stars}</div>
+        <span className="text-sm text-gray-600">
+          {rating.toFixed(1)} ({totalReviews} reseñas)
+        </span>
+      </div>
+    )
+  }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="animate-pulse">
-          <div className="h-64 bg-gray-200"></div>
-          <div className="max-w-7xl mx-auto px-4 py-8">
-            <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 space-y-6">
-                <div className="h-40 bg-gray-200 rounded"></div>
-                <div className="h-40 bg-gray-200 rounded"></div>
-              </div>
-              <div className="h-80 bg-gray-200 rounded"></div>
-            </div>
-          </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando información...</p>
         </div>
       </div>
     )
   }
 
-  if (!organization) {
+  if (error || !organizationData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Organización no encontrada</h2>
-          <p className="text-gray-600 mb-4">La organización que buscas no existe o ha sido eliminada.</p>
-          <Link
-            to="/marketplace"
-            className="bg-emerald-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-600 transition-colors"
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Error al cargar la información
+          </h2>
+          <p className="text-gray-600 mb-4">
+            {error || 'No se pudo cargar la información de la organización'}
+          </p>
+          <button
+            onClick={() => navigate('/marketplace')}
+            className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700"
           >
             Volver al marketplace
-          </Link>
+          </button>
         </div>
       </div>
     )
   }
 
-  const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % organization.images.length)
-  }
-
-  const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + organization.images.length) % organization.images.length)
-  }
+  const { organization, professionals, services_by_category } = organizationData
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Galería de imágenes */}
-      <div className="relative h-80 bg-gray-900 overflow-hidden">
-        <img
-          src={organization.images[currentImageIndex]}
-          alt={organization.name}
-          className="w-full h-full object-cover"
-        />
-        
-        {/* Navegación de imágenes */}
-        {organization.images.length > 1 && (
-          <>
+      {/* Header */}
+      <div className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
             <button
-              onClick={prevImage}
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-all"
+              onClick={() => navigate('/marketplace')}
+              className="flex items-center text-gray-600 hover:text-gray-900"
             >
-              <ChevronLeft className="h-6 w-6" />
-            </button>
-            <button
-              onClick={nextImage}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-all"
-            >
-              <ChevronRight className="h-6 w-6" />
-            </button>
-            
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
-              {organization.images.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentImageIndex(index)}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    index === currentImageIndex ? 'bg-white' : 'bg-white bg-opacity-50'
-                  }`}
-                />
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Overlay con botones */}
-        <div className="absolute inset-0 bg-black bg-opacity-20">
-          <div className="absolute top-4 left-4">
-            <Link
-              to="/marketplace"
-              className="flex items-center bg-white bg-opacity-20 backdrop-blur-sm text-white px-4 py-2 rounded-lg hover:bg-opacity-30 transition-all"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Volver
-            </Link>
-          </div>
-          
-          <div className="absolute top-4 right-4 flex space-x-2">
-            <button className="bg-white bg-opacity-20 backdrop-blur-sm text-white p-2 rounded-lg hover:bg-opacity-30 transition-all">
-              <Share2 className="h-5 w-5" />
-            </button>
-            <button className="bg-white bg-opacity-20 backdrop-blur-sm text-white p-2 rounded-lg hover:bg-opacity-30 transition-all">
-              <Heart className="h-5 w-5" />
+              <ArrowLeft className="h-5 w-5 mr-2" />
+              Volver al marketplace
             </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Contenido principal */}
-          <div className="lg:col-span-2">
-            {/* Header */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
-              <div className="flex flex-col md:flex-row justify-between items-start mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-3xl font-bold text-gray-900">{organization.name}</h1>
-                    {organization.featured && (
-                      <div className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center">
-                        <Star className="h-3 w-3 mr-1" />
-                        Destacado
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
-                    <div className="flex items-center">
-                      <MapPin className="h-4 w-4 mr-1" />
-                      {organization.location}
-                    </div>
-                    <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs">
-                      {organization.category}
-                    </span>
-                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      organization.open_now 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {organization.open_now ? 'Abierto ahora' : 'Cerrado'}
-                    </div>
-                  </div>
+      {/* Hero Section */}
+      <div className="relative">
+        {/* Cover Image */}
+        <div className="h-64 bg-gradient-to-r from-primary-600 to-primary-800 relative">
+          {organization.cover_image && (
+            <img
+              src={organization.cover_image}
+              alt={organization.name}
+              className="w-full h-full object-cover"
+            />
+          )}
+          <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+        </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-5 w-5 ${
-                              i < Math.floor(organization.rating) 
-                                ? 'text-yellow-400 fill-current' 
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="ml-2 font-semibold text-gray-900">{organization.rating}</span>
-                      <span className="ml-1 text-gray-600">({organization.reviewCount} reseñas)</span>
+        {/* Organization Info */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="relative -mt-24 bg-white rounded-lg shadow-lg p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center space-x-4">
+                {organization.logo && (
+                  <img
+                    src={organization.logo}
+                    alt={organization.name}
+                    className="h-20 w-20 rounded-lg object-cover"
+                  />
+                )}
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">
+                    {organization.name}
+                  </h1>
+                  <p className="text-gray-600 mt-1">{organization.industry}</p>
+                  {organization.rating > 0 && (
+                    <div className="mt-2">
+                      {renderRating(organization.rating, organization.total_reviews)}
                     </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 md:mt-0">
-                  <Link
-                    to={`/marketplace/org/${organization.slug}/booking`}
-                    className="bg-emerald-500 text-white px-8 py-3 rounded-xl font-semibold hover:bg-emerald-600 transition-colors inline-flex items-center"
-                  >
-                    <Calendar className="h-5 w-5 mr-2" />
-                    Reservar Cita
-                  </Link>
+                  )}
                 </div>
               </div>
 
-              <p className="text-gray-700 leading-relaxed">{organization.description}</p>
+              <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+                <button
+                  onClick={() => setActiveTab('services')}
+                  className="bg-primary-600 text-white px-6 py-3 rounded-md hover:bg-primary-700 flex items-center justify-center"
+                >
+                  <Calendar className="h-5 w-5 mr-2" />
+                  Reservar Cita
+                </button>
+              </div>
             </div>
 
-            {/* Navegación de tabs */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 mb-6">
-              <div className="border-b border-gray-200">
-                <nav className="flex space-x-8 px-6">
-                  {[
-                    { id: 'overview', label: 'Información' },
-                    { id: 'services', label: 'Servicios' },
-                    { id: 'reviews', label: 'Reseñas' },
-                    { id: 'team', label: 'Equipo' }
-                  ].map(tab => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id as 'overview' | 'services' | 'reviews' | 'team')}
-                      className={`py-4 text-sm font-medium border-b-2 transition-colors ${
-                        activeTab === tab.id
-                          ? 'border-emerald-500 text-emerald-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </nav>
-              </div>
+            {/* Contact Info */}
+            <div className="mt-6 flex flex-wrap gap-4 text-sm text-gray-600">
+              {organization.address && (
+                <div className="flex items-center">
+                  <MapPin className="h-4 w-4 mr-1" />
+                  {organization.address}
+                </div>
+              )}
+              {organization.phone && (
+                <div className="flex items-center">
+                  <Phone className="h-4 w-4 mr-1" />
+                  {organization.phone}
+                </div>
+              )}
+              {organization.email && (
+                <div className="flex items-center">
+                  <Mail className="h-4 w-4 mr-1" />
+                  {organization.email}
+                </div>
+              )}
+              {organization.website && (
+                <div className="flex items-center">
+                  <Globe className="h-4 w-4 mr-1" />
+                  <a
+                    href={organization.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary-600 hover:text-primary-700"
+                  >
+                    Sitio web
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
-              <div className="p-6">
-                {/* Tab: Información */}
-                {activeTab === 'overview' && (
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Características</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        {organization.features.map(feature => (
-                          <div key={feature} className="flex items-center bg-gray-50 rounded-lg px-3 py-2">
-                            <CheckCircle className="h-4 w-4 text-emerald-500 mr-2" />
-                            <span className="text-sm text-gray-700">{feature}</span>
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Tabs */}
+        <div className="border-b border-gray-200 mb-8">
+          <nav className="-mb-px flex space-x-8">
+            {[
+              { id: 'services', label: 'Servicios', icon: Scissors },
+              { id: 'professionals', label: 'Profesionales', icon: Users },
+              { id: 'about', label: 'Acerca de', icon: Clock }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as 'services' | 'professionals' | 'about')}
+                className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === tab.id
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <tab.icon className="h-5 w-5 mr-2" />
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* Tab Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            {activeTab === 'services' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-gray-900">Servicios</h2>
+                {Object.entries(services_by_category).map(([category, services]) => (
+                  <div key={category} className="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <button
+                      onClick={() => toggleCategory(category)}
+                      className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50"
+                    >
+                      <h3 className="text-lg font-semibold text-gray-900">{category}</h3>
+                      {expandedCategories.has(category) ? (
+                        <ChevronUp className="h-5 w-5 text-gray-400" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-gray-400" />
+                      )}
+                    </button>
+                    
+                    {expandedCategories.has(category) && (
+                      <div className="px-6 pb-4 space-y-4">
+                        {services.map((service) => (
+                          <div key={service.id} className="border-l-4 border-primary-200 pl-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <h4 className="font-medium text-gray-900">{service.name}</h4>
+                                {service.description && (
+                                  <p className="text-sm text-gray-600 mt-1">{service.description}</p>
+                                )}
+                                <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                                  <div className="flex items-center">
+                                    <Clock className="h-4 w-4 mr-1" />
+                                    {service.duration_minutes} min
+                                  </div>
+                                  <div className="font-semibold text-primary-600">
+                                    ${service.price}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="ml-4 flex space-x-2">
+                                <button
+                                  onClick={() => handleBookService(service)}
+                                  className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700"
+                                >
+                                  Reservar
+                                </button>
+                                <button
+                                  onClick={() => handleBookService(service)}
+                                  className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-50"
+                                >
+                                  Elegir profesional
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>
-                    </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
+            {activeTab === 'professionals' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-gray-900">Profesionales</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {professionals.map((professional) => (
+                    <div key={professional.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                      <div className="flex items-center space-x-4">
+                        <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center">
+                          <User className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-900">{professional.name}</h3>
+                          <p className="text-sm text-gray-600">{professional.specialty}</p>
+                        </div>
+                      </div>
+                      
+                      {professional.bio && (
+                        <p className="mt-4 text-sm text-gray-600">{professional.bio}</p>
+                      )}
+                      
+                      {professional.specialty && (
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium text-gray-900 mb-2">Especialidad:</h4>
+                          <div className="flex flex-wrap gap-2">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                              {professional.specialty}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="mt-4 flex space-x-3">
+                        <button
+                          onClick={() => handleBookService(services_by_category[Object.keys(services_by_category)[0]]?.[0], professional)}
+                          className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700"
+                        >
+                          Reservar con {professional.name.split(' ')[0]}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'about' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-gray-900">Acerca de</h2>
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  {organization.description && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Descripción</h3>
+                      <p className="text-gray-600">{organization.description}</p>
+                    </div>
+                  )}
+                  
+                  {organization.opening_hours && (
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Horarios de Atención</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Horarios de atención</h3>
                       <div className="space-y-2">
-                        {Object.entries(organization.hours).map(([day, hours]) => (
-                          <div key={day} className="flex justify-between py-2 border-b border-gray-100 last:border-0">
+                        {Object.entries(organization.opening_hours).map(([day, hours]) => (
+                          <div key={day} className="flex justify-between">
                             <span className="font-medium text-gray-900">{day}</span>
                             <span className="text-gray-600">{hours}</span>
                           </div>
                         ))}
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {/* Tab: Servicios */}
-                {activeTab === 'services' && (
-                  <div className="space-y-4">
-                    {organization.services.map((service, index) => (
-                      <div key={index} className="flex justify-between items-center py-4 border-b border-gray-100 last:border-0">
-                        <div>
-                          <h4 className="font-semibold text-gray-900">{service.name}</h4>
-                          <p className="text-sm text-gray-600">{service.duration}</p>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-bold text-emerald-600">{service.price}</div>
-                          <Link
-                            to={`/marketplace/org/${organization.slug}/booking?service=${encodeURIComponent(service.name)}`}
-                            className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
-                          >
-                            Reservar
-                          </Link>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Tab: Reseñas */}
-                {activeTab === 'reviews' && (
-                  <div className="space-y-6">
-                    {reviews.map(review => (
-                      <div key={review.id} className="border-b border-gray-100 pb-6 last:border-0">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold text-gray-900">{review.user}</span>
-                              <span className="text-sm text-gray-500">• {review.service}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex">
-                                {[...Array(5)].map((_, i) => (
-                                  <Star
-                                    key={i}
-                                    className={`h-4 w-4 ${
-                                      i < review.rating 
-                                        ? 'text-yellow-400 fill-current' 
-                                        : 'text-gray-300'
-                                    }`}
-                                  />
-                                ))}
-                              </div>
-                              <span className="text-sm text-gray-500">{review.date}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <p className="text-gray-700">{review.comment}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Tab: Equipo */}
-                {activeTab === 'team' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {organization.team.map((member, index) => (
-                      <div key={index} className="flex items-center bg-gray-50 rounded-xl p-4">
-                        <img
-                          src={member.image}
-                          alt={member.name}
-                          className="w-16 h-16 rounded-full object-cover mr-4"
-                        />
-                        <div>
-                          <h4 className="font-semibold text-gray-900">{member.name}</h4>
-                          <p className="text-sm text-gray-600">{member.role}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Sidebar de contacto */}
+          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Información de contacto */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Información de Contacto</h3>
-              <div className="space-y-4">
-                <div className="flex items-center">
-                  <MapPin className="h-5 w-5 text-gray-400 mr-3" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Dirección</p>
-                    <p className="text-sm text-gray-600">{organization.address}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center">
-                  <Phone className="h-5 w-5 text-gray-400 mr-3" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Teléfono</p>
-                    <a href={`tel:${organization.phone}`} className="text-sm text-emerald-600 hover:text-emerald-700">
-                      {organization.phone}
-                    </a>
-                  </div>
-                </div>
-                
-                <div className="flex items-center">
-                  <Globe className="h-5 w-5 text-gray-400 mr-3" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Sitio web</p>
-                    <a 
-                      href={organization.website} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-sm text-emerald-600 hover:text-emerald-700"
-                    >
-                      Visitar sitio web
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Disponibilidad rápida */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Disponibilidad</h3>
-              <div className="flex items-center mb-4">
-                <Clock className="h-5 w-5 text-emerald-500 mr-2" />
-                <span className="text-sm text-gray-700">Próxima cita disponible:</span>
-              </div>
-              <p className="font-semibold text-emerald-600 mb-4">{organization.next_available}</p>
-              <Link
-                to={`/marketplace/org/${organization.slug}/booking`}
-                className="w-full bg-emerald-500 text-white py-3 rounded-lg font-medium hover:bg-emerald-600 transition-colors text-center block"
+            {/* Quick Book */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Reserva rápida</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                ¿No sabes qué servicio necesitas? Programa una consulta general.
+              </p>
+              <button
+                onClick={() => handleBookService(services_by_category[Object.keys(services_by_category)[0]]?.[0])}
+                className="w-full bg-primary-600 text-white px-4 py-3 rounded-md hover:bg-primary-700 flex items-center justify-center"
               >
-                Reservar Ahora
-              </Link>
+                <Calendar className="h-5 w-5 mr-2" />
+                Reservar ahora
+              </button>
             </div>
 
-            {/* Estadísticas */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">En números</h3>
-              <div className="space-y-4">
+            {/* Stats */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Estadísticas</h3>
+              <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Clientes atendidos</span>
-                  <span className="font-semibold">1,200+</span>
+                  <span className="text-sm text-gray-600">Total de servicios</span>
+                  <span className="font-semibold text-gray-900">
+                    {Object.values(services_by_category).reduce((acc, services) => acc + services.length, 0)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Años de experiencia</span>
-                  <span className="font-semibold">10+</span>
+                  <span className="text-sm text-gray-600">Profesionales</span>
+                  <span className="font-semibold text-gray-900">{professionals.length}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Valoración promedio</span>
-                  <span className="font-semibold">{organization.rating}/5</span>
-                </div>
+                {organization.rating > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Calificación</span>
+                    <span className="font-semibold text-gray-900">{organization.rating.toFixed(1)}/5</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Booking Modal */}
+      {isBookingModalOpen && selectedService && (
+        <BookingModal
+          isOpen={isBookingModalOpen}
+          onClose={handleCloseModal}
+          organization={organization}
+          service={selectedService}
+          selectedProfessional={selectedProfessional}
+          onSuccess={handleBookingSuccess}
+        />
+      )}
     </div>
   )
 }

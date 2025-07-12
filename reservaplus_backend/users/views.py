@@ -318,6 +318,41 @@ class OrganizationUserCreateView(generics.CreateAPIView):
         # Crear el usuario
         user = serializer.save(organization=organization)
         
+        # Establecer que requiere cambio de contraseña
+        user.requires_password_change = True
+        user.save()
+        
+        # Crear perfil profesional automáticamente si es necesario
+        if user.is_professional or user.role == 'professional':
+            from organizations.models import Professional
+            
+            # Verificar si ya existe un perfil profesional (por seguridad)
+            if not hasattr(user, 'professional_profile') or not user.professional_profile:
+                professional = Professional.objects.create(
+                    organization=organization,
+                    user=user,
+                    name=f"{user.first_name} {user.last_name}".strip(),
+                    email=user.email,
+                    phone=user.phone or '',
+                    specialty='',  # Se puede configurar después
+                    bio='',  # Se puede configurar después
+                    color_code='#4CAF50',  # Color por defecto
+                    is_active=True,
+                    accepts_walk_ins=True
+                )
+                
+                # Crear horario básico para el profesional
+                from schedule.models import ProfessionalSchedule
+                ProfessionalSchedule.objects.create(
+                    professional=professional,
+                    timezone='America/Santiago',
+                    min_booking_notice=60,  # 1 hora
+                    max_booking_advance=10080,  # 1 semana
+                    slot_duration=30,  # 30 minutos
+                    is_active=True,
+                    accepts_bookings=True
+                )
+        
         # Incrementar contadores específicos
         subscription.increment_users_count()
         
@@ -327,6 +362,87 @@ class OrganizationUserCreateView(generics.CreateAPIView):
             subscription.increment_receptionists_count()
         elif user.role == 'staff':
             subscription.increment_staff_count()
+    
+    def create(self, request, *args, **kwargs):
+        """
+        Crear usuario con validaciones personalizadas y retornar contraseña generada
+        """
+        # Validaciones personalizadas antes de usar el serializer
+        errors = {}
+        
+        # Validar username sin acentos ni caracteres especiales
+        username = request.data.get('username', '')
+        if username:
+            import re
+            import unicodedata
+            
+            # Normalizar y verificar que no hay acentos
+            normalized = unicodedata.normalize('NFD', username)
+            ascii_username = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
+            
+            if normalized != ascii_username:
+                errors['username'] = ['El nombre de usuario no puede contener acentos.']
+            elif not re.match(r'^[a-zA-Z0-9._-]+$', username):
+                errors['username'] = ['El nombre de usuario solo puede contener letras, números, puntos, guiones y guiones bajos.']
+            elif len(username) < 3:
+                errors['username'] = ['El nombre de usuario debe tener al menos 3 caracteres.']
+        
+        # Validar otros campos
+        if not request.data.get('first_name', '').strip():
+            errors['first_name'] = ['El nombre es obligatorio.']
+        
+        if not request.data.get('last_name', '').strip():
+            errors['last_name'] = ['El apellido es obligatorio.']
+        
+        email = request.data.get('email', '')
+        if email:
+            import re
+            if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+                errors['email'] = ['El formato del email no es válido.']
+            else:
+                # Verificar que el email no exista en toda la plataforma
+                if User.objects.filter(email=email).exists():
+                    errors['email'] = ['Este email ya está registrado en la plataforma.']
+        
+        # Si hay errores de validación personalizados, retornarlos
+        if errors:
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Continuar con la validación normal del serializer
+        serializer = self.get_serializer(data=request.data)
+        
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError as e:
+            # Formatear errores del serializer para que coincidan con nuestro formato
+            formatted_errors = {}
+            if hasattr(e, 'detail'):
+                for field, messages in e.detail.items():
+                    if isinstance(messages, list):
+                        formatted_errors[field] = messages
+                    else:
+                        formatted_errors[field] = [str(messages)]
+            return Response(formatted_errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Crear el usuario
+        try:
+            self.perform_create(serializer)
+        except ValidationError as e:
+            # Manejar errores de límites de plan
+            return Response({'non_field_errors': [str(e)]}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Obtener la contraseña generada
+        temp_password = getattr(serializer.instance, 'temp_password', None)
+        
+        # Preparar respuesta
+        response_data = UserSerializer(serializer.instance).data
+        
+        if temp_password:
+            response_data['temp_password'] = temp_password
+            response_data['message'] = 'Usuario creado exitosamente. Se ha generado una contraseña temporal.'
+        
+        headers = self.get_success_headers(serializer.data)
+        return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 class OrganizationUserDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -345,6 +461,12 @@ class OrganizationUserDetailView(generics.RetrieveUpdateDestroyAPIView):
         user = self.get_object()
         old_role = user.role
         new_role = serializer.validated_data.get('role', old_role)
+        
+        # Verificar email único si cambió
+        new_email = serializer.validated_data.get('email')
+        if new_email and new_email != user.email:
+            if User.objects.filter(email=new_email).exclude(id=user.id).exists():
+                raise ValidationError({'email': ['Este email ya está registrado en la plataforma.']})
         
         # Si cambió el rol, verificar límites antes de actualizar
         subscription = getattr(self.request.user.organization, 'subscription', None)
@@ -366,8 +488,53 @@ class OrganizationUserDetailView(generics.RetrieveUpdateDestroyAPIView):
                     f"Actualmente tienes {subscription.current_staff_count} staff."
                 )
         
+        # Obtener valores anteriores
+        old_is_professional = user.is_professional
+        
         # Actualizar usuario
         updated_user = serializer.save()
+        
+        # Crear perfil profesional si es necesario
+        if (updated_user.is_professional or updated_user.role == 'professional') and not old_is_professional:
+            from organizations.models import Professional
+            
+            # Verificar si ya existe un perfil profesional (por seguridad)
+            if not hasattr(updated_user, 'professional_profile') or not updated_user.professional_profile:
+                professional = Professional.objects.create(
+                    organization=self.request.user.organization,
+                    user=updated_user,
+                    name=f"{updated_user.first_name} {updated_user.last_name}".strip(),
+                    email=updated_user.email,
+                    phone=updated_user.phone or '',
+                    specialty='',  # Se puede configurar después
+                    bio='',  # Se puede configurar después
+                    color_code='#4CAF50',  # Color por defecto
+                    is_active=True,
+                    accepts_walk_ins=True
+                )
+                
+                # Crear horario básico para el profesional
+                from schedule.models import ProfessionalSchedule
+                ProfessionalSchedule.objects.create(
+                    professional=professional,
+                    timezone='America/Santiago',
+                    min_booking_notice=60,  # 1 hora
+                    max_booking_advance=10080,  # 1 semana
+                    slot_duration=30,  # 30 minutos
+                    is_active=True,
+                    accepts_bookings=True
+                )
+        
+        # Eliminar perfil profesional si ya no es profesional
+        elif not (updated_user.is_professional or updated_user.role == 'professional') and old_is_professional:
+            if hasattr(updated_user, 'professional_profile') and updated_user.professional_profile:
+                professional = updated_user.professional_profile
+                
+                # Eliminar relación con servicios
+                professional.services.clear()
+                
+                # Eliminar el perfil profesional
+                professional.delete()
         
         # Actualizar contadores si cambió el rol
         if subscription and old_role != updated_user.role:
@@ -392,6 +559,28 @@ class OrganizationUserDetailView(generics.RetrieveUpdateDestroyAPIView):
         if instance.role == 'owner':
             raise ValidationError("No se puede eliminar al propietario de la organización")
         
+        # Cascada: Eliminar profesional relacionado si existe
+        if hasattr(instance, 'professional_profile') and instance.professional_profile:
+            professional = instance.professional_profile
+            
+            # Eliminar relación con servicios
+            professional.services.clear()
+            
+            # Eliminar el perfil profesional (esto también eliminará citas por CASCADE)
+            professional.delete()
+        
+        # Cascada: Manejar citas creadas por este usuario
+        # Las citas donde este usuario es created_by se eliminarán automáticamente por CASCADE
+        # Las citas donde este usuario es cancelled_by se mantendrán pero con cancelled_by=NULL por SET_NULL
+        
+        # Cascada: Manejar historial de citas (se elimina automáticamente por CASCADE)
+        
+        # Cascada: Manejar citas recurrentes creadas por este usuario (se elimina automáticamente por CASCADE)
+        
+        # Cascada: Eliminar perfil de usuario si existe
+        if hasattr(instance, 'profile') and instance.profile:
+            instance.profile.delete()
+        
         # Decrementar contadores
         subscription = getattr(self.request.user.organization, 'subscription', None)
         if subscription:
@@ -405,6 +594,8 @@ class OrganizationUserDetailView(generics.RetrieveUpdateDestroyAPIView):
             elif instance.role == 'staff':
                 subscription.decrement_staff_count()
         
+        # Finalmente eliminar el usuario
+        # Esto activará todas las cascadas automáticas de Django
         instance.delete()
 
 
@@ -444,6 +635,28 @@ class UserToggleStatusView(APIView):
             "user_id": str(user.id),
             "new_status": "active" if user.is_active_in_org else "inactive",
             "message": f"Usuario {'activado' if user.is_active_in_org else 'desactivado'} correctamente"
+        })
+
+
+class CheckEmailView(APIView):
+    """
+    Vista para verificar si un email ya existe en la plataforma
+    """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        email = request.query_params.get('email', '')
+        
+        if not email:
+            return Response({'error': 'Email es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verificar si el email ya existe
+        exists = User.objects.filter(email=email).exists()
+        
+        return Response({
+            'exists': exists,
+            'email': email
         })
 
 
@@ -662,3 +875,24 @@ class CurrentUserUpdateView(generics.UpdateAPIView):
             })
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class OrganizationProfessionalsView(generics.ListAPIView):
+    """
+    Vista para obtener todos los profesionales de la organización
+    """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserSerializer
+    
+    def get_queryset(self):
+        organization = self.request.user.organization
+        if not organization:
+            return User.objects.none()
+        
+        # Filtrar usuarios que son profesionales en la organización
+        return User.objects.filter(
+            organization=organization,
+            is_professional=True,
+            is_active_in_org=True
+        ).order_by('first_name', 'last_name')

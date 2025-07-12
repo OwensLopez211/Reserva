@@ -61,14 +61,14 @@ const OrganizationConfigPage: React.FC = () => {
       setConfig(getIndustryTemplate(organizationData.industry_template))
     } else {
       // Fallback a localStorage si no hay datos en contexto
-      const registrationData = localStorage.getItem('registrationData')
-      if (registrationData) {
-        const data = JSON.parse(registrationData)
-        setSelectedIndustry(data.industryTemplate)
-        setConfig(getIndustryTemplate(data.industryTemplate))
-      } else {
-        navigate('/onboarding/register')
-      }
+    const registrationData = localStorage.getItem('registrationData')
+    if (registrationData) {
+      const data = JSON.parse(registrationData)
+      setSelectedIndustry(data.industryTemplate)
+      setConfig(getIndustryTemplate(data.industryTemplate))
+    } else {
+      navigate('/onboarding/register')
+    }
     }
   }, [navigate, registrationToken, organizationData])
 

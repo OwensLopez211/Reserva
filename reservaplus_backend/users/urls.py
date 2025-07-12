@@ -30,6 +30,12 @@ urlpatterns = [
     # Información de roles
     path('roles/', views.UserRolesView.as_view(), name='user-roles'),
     
+    # Verificar email único
+    path('check-email/', views.CheckEmailView.as_view(), name='check-email'),
+    
+    # Obtener profesionales de la organización
+    path('professionals/', views.OrganizationProfessionalsView.as_view(), name='organization-professionals'),
+    
     # CRUD de usuarios (ViewSet existente)
     path('', include(router.urls)),
 ]

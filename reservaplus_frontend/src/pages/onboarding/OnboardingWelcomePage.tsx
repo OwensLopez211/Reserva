@@ -7,16 +7,28 @@ import {
   Settings, 
   CreditCard, 
   ArrowRight, 
-  Rocket
+  Rocket,
+  AlertCircle
 } from 'lucide-react'
 import { useOnboarding } from '../../contexts/OnboardingContext'
 import { OnboardingProgressIndicator } from '../../components/onboarding/OnboardingProgressIndicator'
 
 const OnboardingWelcomePage: React.FC = () => {
   const navigate = useNavigate()
-  const { organizationData, professionals, services, planInfo, registrationToken } = useOnboarding()
+  const { 
+    organizationData, 
+    professionals, 
+    services, 
+    planInfo, 
+    registrationToken, 
+    completeOnboarding, 
+    isCompleting,
+    canProceedFromStep 
+  } = useOnboarding()
+  
   const [isLoading, setIsLoading] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     // Verificar que tengamos token de registro válido
@@ -25,18 +37,43 @@ const OnboardingWelcomePage: React.FC = () => {
       return
     }
 
+    // Verificar que todos los pasos anteriores estén completos
+    if (!canProceedFromStep(4)) {
+      navigate('/onboarding/organization')
+      return
+    }
+
     // Activar confetti al cargar
     setShowConfetti(true)
     setTimeout(() => setShowConfetti(false), 3000)
-  }, [registrationToken, navigate])
+  }, [registrationToken, navigate, canProceedFromStep])
 
-  const handleGetStarted = async () => {
+  const handleCompleteOnboarding = async () => {
+    if (!registrationToken) {
+      setError('No se encontró token de registro válido')
+      return
+    }
+
     setIsLoading(true)
+    setError(null)
+
     try {
+      console.log('🎉 Completando onboarding desde la página de bienvenida...')
+      
+      // Completar el onboarding usando el contexto
+      await completeOnboarding()
+      
+      console.log('✅ Onboarding completado exitosamente')
+      
+      // Esperar un momento para que se procesen los datos
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
       // Navegar al dashboard
-      navigate('/dashboard')
+      navigate('/app/dashboard')
+      
     } catch (error) {
-      console.error('Error navegando al dashboard:', error)
+      console.error('❌ Error completando onboarding:', error)
+      setError(error instanceof Error ? error.message : 'Error desconocido al completar el onboarding')
     } finally {
       setIsLoading(false)
     }
@@ -110,7 +147,7 @@ const OnboardingWelcomePage: React.FC = () => {
             </div>
             <div className="flex items-center text-emerald-600">
               <CheckCircle className="w-5 h-5 mr-2" />
-              <span className="text-sm font-medium">¡Registro Completado!</span>
+              <span className="text-sm font-medium">¡Configuración Completada!</span>
             </div>
           </div>
         </div>
@@ -202,6 +239,19 @@ const OnboardingWelcomePage: React.FC = () => {
           </div>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mb-8 bg-red-50 border border-red-200 rounded-xl p-6">
+            <div className="flex items-center">
+              <AlertCircle className="w-6 h-6 text-red-500 mr-3" />
+              <div>
+                <h3 className="font-semibold text-red-900">Error al completar el onboarding</h3>
+                <p className="text-red-700 mt-1">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* CTA Section */}
         <div className="text-center">
           <div className="bg-white rounded-3xl shadow-2xl border p-12">
@@ -209,23 +259,23 @@ const OnboardingWelcomePage: React.FC = () => {
               ¿Listo para gestionar tu primer cliente?
             </h2>
             <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-              Accede a tu panel de control y comienza a usar todas las herramientas que hemos preparado para ti
+              Finaliza tu configuración y accede a tu panel de control para comenzar a usar todas las herramientas que hemos preparado para ti
             </p>
             
             <button
-              onClick={handleGetStarted}
-              disabled={isLoading}
+              onClick={handleCompleteOnboarding}
+              disabled={isLoading || isCompleting}
               className="inline-flex items-center px-12 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white text-xl font-bold rounded-2xl hover:from-emerald-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              {isLoading ? (
+              {isLoading || isCompleting ? (
                 <>
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
-                  Cargando dashboard...
+                  Finalizando configuración...
                 </>
               ) : (
                 <>
                   <Rocket className="w-6 h-6 mr-3" />
-                  Ir a mi Dashboard
+                  Finalizar y Acceder
                   <ArrowRight className="w-6 h-6 ml-3" />
                 </>
               )}

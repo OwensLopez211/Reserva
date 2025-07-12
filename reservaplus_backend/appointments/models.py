@@ -134,6 +134,12 @@ class Appointment(models.Model):
             if not self.service.professionals.filter(id=self.professional.id).exists():
                 raise ValidationError("El profesional seleccionado no puede realizar este servicio")
         
+        # NUEVA VALIDACIÓN: Verificar disponibilidad según horario del profesional
+        if self.professional and self.start_datetime and self.service:
+            is_available, reason = self._validate_professional_availability()
+            if not is_available:
+                raise ValidationError(f"Horario no disponible: {reason}")
+        
         # Validar que no haya solapamiento con otras citas del mismo profesional
         if self.professional and self.start_datetime and self.end_datetime:
             overlapping = Appointment.objects.filter(
@@ -160,7 +166,11 @@ class Appointment(models.Model):
             self.price = self.service.price
         
         # Validar antes de guardar
-        self.full_clean()
+        try:
+            self.full_clean()
+        except ValidationError as e:
+            # Re-raise validation errors for proper handling
+            raise e
         
         super().save(*args, **kwargs)
     
@@ -256,6 +266,27 @@ class Appointment(models.Model):
         if self.status in ['pending', 'confirmed'] and self.is_past:
             self.status = 'no_show'
             self.save(update_fields=['status', 'updated_at'])
+    
+    def _validate_professional_availability(self):
+        """
+        Validar disponibilidad del profesional según su horario configurado
+        
+        Returns:
+            Tuple[bool, str]: (is_available, reason)
+        """
+        # Importar aquí para evitar import circular
+        from schedule.services import AvailabilityCalculationService
+        
+        # Si no tiene horario configurado, permitir (backward compatibility)
+        from schedule.models import ProfessionalSchedule
+        try:
+            professional_schedule = ProfessionalSchedule.objects.get(professional=self.professional)
+        except ProfessionalSchedule.DoesNotExist:
+            return True, "Sin horario configurado"
+        
+        # Usar el servicio de cálculo de disponibilidad
+        availability_service = AvailabilityCalculationService(self.professional)
+        return availability_service.is_available_at_time(self.start_datetime, self.service)
 
 
 class AppointmentHistory(models.Model):

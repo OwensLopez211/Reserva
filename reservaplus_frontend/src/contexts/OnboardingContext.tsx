@@ -1,9 +1,9 @@
-// src/contexts/OnboardingContext.tsx - VERSIÓN CON PERSISTENCIA COMPLETA
+// src/contexts/OnboardingContext.tsx - VERSIÓN ALINEADA CON BACKEND REFACTORIZADO
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'
 import { OnboardingService } from '../services/onboardingService'
 
-// Tipos alineados con el backend
+// Tipos alineados con el backend refactorizado
 interface OrganizationData {
   name: string
   industry_template: string
@@ -12,17 +12,6 @@ interface OrganizationData {
   address?: string
   city?: string
   country: string
-}
-
-interface TeamMemberData {
-  name: string
-  email: string
-  phone: string
-  role: 'owner' | 'professional' | 'reception' | 'staff'
-  specialty?: string
-  is_professional: boolean
-  color_code: string
-  accepts_walk_ins: boolean
 }
 
 interface ProfessionalData {
@@ -66,7 +55,7 @@ interface OnboardingContextType {
   nextStep: () => void
   prevStep: () => void
   markStepCompleted: (step: number) => void
-  navigateToCurrentStep: () => string // Nuevo método para obtener la URL del paso actual
+  navigateToCurrentStep: () => string
   
   // Métodos de datos
   updateOrganizationData: (data: Partial<OrganizationData>) => void
@@ -121,16 +110,17 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   // Flag para evitar inicialización múltiple
   const [initialized, setInitialized] = useState(false)
 
-  // Configuración de pasos
-  const totalSteps = 5
+  // Configuración de pasos - CORREGIDO para 6 pasos
+  const totalSteps = 6
   
-  // Mapeo de pasos a URLs
+  // Mapeo de pasos a URLs - ACTUALIZADO
   const stepToUrlMap = {
     0: '/onboarding/plan',
     1: '/onboarding/register', 
     2: '/onboarding/team',
     3: '/onboarding/services',
-    4: '/onboarding/complete'
+    4: '/onboarding/organization',
+    5: '/onboarding/welcome'
   }
   
   // Colores predefinidos para profesionales
@@ -142,9 +132,9 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   // Clave para localStorage
   const STORAGE_KEY = 'onboarding_progress'
 
-  // Guardar progreso en localStorage - mejorado
+  // Guardar progreso en localStorage
   const saveProgress = useCallback(() => {
-    if (!initialized) return // No guardar hasta que esté inicializado
+    if (!initialized) return
     
     const progressData = {
       currentStep,
@@ -154,7 +144,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       services,
       registrationToken,
       planInfo,
-      timestamp: Date.now() // Para detectar datos obsoletos
+      timestamp: Date.now()
     }
     
     try {
@@ -194,7 +184,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     return stepToUrlMap[currentStep as keyof typeof stepToUrlMap] || '/onboarding/plan'
   }, [currentStep])
 
-  // Inicializar desde token de registro - usando useCallback
+  // Inicializar desde token de registro
   const initializeFromToken = useCallback(async (token: string): Promise<boolean> => {
     try {
       const status = await OnboardingService.checkRegistrationStatus(token)
@@ -202,157 +192,69 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       if (status.is_valid) {
         setRegistrationToken(token)
         setPlanInfo(status.selected_plan || null)
-        
-        // Cargar progreso guardado si existe
-        const savedProgress = loadProgress()
-        if (savedProgress) {
-          console.log('📂 Cargando progreso guardado:', savedProgress.currentStep)
-          
-          if (savedProgress.organizationData) setOrganizationData(savedProgress.organizationData)
-          if (savedProgress.professionals) setProfessionals(savedProgress.professionals)
-          if (savedProgress.services) setServices(savedProgress.services)
-          if (savedProgress.currentStep !== undefined) setCurrentStep(savedProgress.currentStep)
-          if (savedProgress.completedSteps) setCompletedSteps(savedProgress.completedSteps)
-        }
-        
-        // También cargar datos de la organización desde el registro si no están en el progreso
-        const registrationData = localStorage.getItem('registration_form_data')
-        if (registrationData && (!savedProgress?.organizationData?.name)) {
-          try {
-            const regData = JSON.parse(registrationData)
-            console.log('📋 Cargando datos de organización del registro:', regData)
-            
-            if (regData.formData?.organizationName) {
-              setOrganizationData({
-                name: regData.formData.organizationName,
-                industry_template: regData.industryTemplate || 'salon',
-                email: regData.businessInfo?.email || regData.formData?.businessEmail || '',
-                phone: regData.businessInfo?.phone || regData.formData?.businessPhone || '',
-                address: regData.businessInfo?.address || regData.formData?.address || '',
-                city: regData.businessInfo?.city || regData.formData?.city || '',
-                country: regData.businessInfo?.country || regData.formData?.country || 'Chile'
-              })
-            }
-          } catch (error) {
-            console.error('Error cargando datos de registro:', error)
-          }
-        }
-        
-        setInitialized(true)
+        console.log('✅ Token válido, datos cargados:', status)
         return true
       } else {
-        OnboardingService.clearOnboardingData()
-        setRegistrationToken(null)
-        setInitialized(true)
+        console.log('❌ Token inválido o expirado')
         return false
       }
     } catch (error) {
-      console.error('Error al inicializar desde token:', error)
-      setInitialized(true)
+      console.error('Error verificando token:', error)
       return false
     }
-  }, [loadProgress])
+  }, [])
 
-  // Inicializar desde localStorage al cargar - SOLO UNA VEZ
+  // Inicialización - Cargar progreso guardado y token
   useEffect(() => {
-    if (!initialized) {
-      const token = OnboardingService.getStoredToken()
-      if (token) {
-        initializeFromToken(token)
-      } else {
-        // Si no hay token, intentar cargar progreso local de todas formas
-        const savedProgress = loadProgress()
-        if (savedProgress && savedProgress.registrationToken) {
-          initializeFromToken(savedProgress.registrationToken)
-        } else {
-          // Cargar datos de organización desde el registro si están disponibles
-          const registrationData = localStorage.getItem('registration_form_data')
-          if (registrationData) {
-            try {
-              const regData = JSON.parse(registrationData)
-              console.log('📋 Cargando datos de organización del registro (sin token):', regData)
-              
-              if (regData.formData?.organizationName) {
-                setOrganizationData({
-                  name: regData.formData.organizationName,
-                  industry_template: regData.industryTemplate || 'salon',
-                  email: regData.businessInfo?.email || regData.formData?.businessEmail || '',
-                  phone: regData.businessInfo?.phone || regData.formData?.businessPhone || '',
-                  address: regData.businessInfo?.address || regData.formData?.address || '',
-                  city: regData.businessInfo?.city || regData.formData?.city || '',
-                  country: regData.businessInfo?.country || regData.formData?.country || 'Chile'
-                })
-              }
-            } catch (error) {
-              console.error('Error cargando datos de registro (sin token):', error)
-            }
-          }
-          setInitialized(true)
-        }
-      }
-    }
-  }, [initialized, initializeFromToken, loadProgress])
+    if (initialized) return
 
-  // Auto-guardar cuando cambian los datos importantes
+    console.log('🚀 Inicializando OnboardingContext...')
+    
+    // Cargar progreso guardado
+        const savedProgress = loadProgress()
+    if (savedProgress) {
+      console.log('📄 Cargando progreso guardado:', savedProgress)
+      setCurrentStep(savedProgress.currentStep || 0)
+      setCompletedSteps(savedProgress.completedSteps || [])
+      setOrganizationData(savedProgress.organizationData || organizationData)
+      setProfessionals(savedProgress.professionals || [])
+      setServices(savedProgress.services || [])
+      setRegistrationToken(savedProgress.registrationToken || null)
+      setPlanInfo(savedProgress.planInfo || null)
+    }
+
+    // Verificar token almacenado
+    const storedToken = OnboardingService.getStoredToken()
+    if (storedToken && !savedProgress?.registrationToken) {
+      console.log('🔍 Verificando token almacenado...')
+      initializeFromToken(storedToken)
+    }
+
+    setInitialized(true)
+    console.log('✅ OnboardingContext inicializado')
+  }, [loadProgress, initializeFromToken, organizationData, initialized])
+
+  // Guardar progreso cuando cambien los datos
   useEffect(() => {
     if (initialized) {
-      const timeoutId = setTimeout(() => {
         saveProgress()
-      }, 500) // Debounce de 500ms
-      
-      return () => clearTimeout(timeoutId)
     }
-  }, [initialized, currentStep, completedSteps, organizationData, professionals, services, saveProgress])
+  }, [saveProgress, initialized])
 
-  // Validación usando useCallback para evitar recreación constante
-  const canProceedFromStep = useCallback((step: number): boolean => {
-    switch (step) {
-      case 0: // Plan selection
-        return !!registrationToken
-        
-      case 1: // Registration
-        return !!registrationToken
-        
-      case 2: // Team
-        if (professionals.length === 0) {
-          return false
-        }
-        
-        return professionals.every((p) => {
-          const hasRequired = !!(p.name?.trim() && p.email?.trim() && p.phone?.trim())
-          const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email || '')
-          return hasRequired && isValidEmail
-        })
-        
-      case 3: // Services
-        return services.length > 0 && 
-               services.every(s => s.name?.trim() && s.price > 0 && s.duration_minutes > 0)
-               
-      case 4: // Complete
-        return true
-        
-      default:
-        return false
-    }
-  }, [registrationToken, professionals, services])
-
-  // Métodos de navegación usando useCallback
+  // Métodos de navegación
   const nextStep = useCallback(() => {
-    if (currentStep < totalSteps - 1 && canProceedFromStep(currentStep)) {
-      const newCompletedSteps = [...completedSteps]
-      if (!newCompletedSteps.includes(currentStep)) {
-        newCompletedSteps.push(currentStep)
-      }
-      
+    if (currentStep < totalSteps - 1) {
       const newStep = currentStep + 1
       setCurrentStep(newStep)
-      setCompletedSteps(newCompletedSteps)
+      console.log('➡️ Avanzando al paso:', newStep)
     }
-  }, [currentStep, totalSteps, canProceedFromStep, completedSteps])
+  }, [currentStep, totalSteps])
 
   const prevStep = useCallback(() => {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1)
+      const newStep = currentStep - 1
+      setCurrentStep(newStep)
+      console.log('⬅️ Retrocediendo al paso:', newStep)
     }
   }, [currentStep])
 
@@ -360,17 +262,23 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     setCompletedSteps(prev => {
       if (!prev.includes(step)) {
         const newCompleted = [...prev, step]
+        console.log('✅ Paso completado:', step, 'Total completados:', newCompleted)
         return newCompleted
       }
       return prev
     })
   }, [])
 
-  // Métodos de datos usando useCallback
+  // Métodos de datos - Organización
   const updateOrganizationData = useCallback((data: Partial<OrganizationData>) => {
-    setOrganizationData(prev => ({ ...prev, ...data }))
+    setOrganizationData(prev => {
+      const updated = { ...prev, ...data }
+      console.log('🏢 Datos de organización actualizados:', data)
+      return updated
+    })
   }, [])
 
+  // Métodos de datos - Profesionales
   const addProfessional = useCallback(() => {
     const newProfessional: ProfessionalData = {
       name: '',
@@ -380,58 +288,97 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       color_code: professionalColors[professionals.length % professionalColors.length],
       accepts_walk_ins: true
     }
-    setProfessionals(prev => [...prev, newProfessional])
-  }, [professionals.length, professionalColors])
+    
+    setProfessionals(prev => {
+      const updated = [...prev, newProfessional]
+      console.log('👤 Profesional agregado, total:', updated.length)
+      return updated
+    })
+  }, [professionals.length])
 
   const updateProfessional = useCallback((index: number, data: Partial<ProfessionalData>) => {
     setProfessionals(prev => {
       const updated = [...prev]
-      if (updated[index]) {
         updated[index] = { ...updated[index], ...data }
-      }
+      console.log('👤 Profesional actualizado:', index, data)
       return updated
     })
   }, [])
 
   const removeProfessional = useCallback((index: number) => {
-    setProfessionals(prev => prev.filter((_, i) => i !== index))
+    setProfessionals(prev => {
+      const updated = prev.filter((_, i) => i !== index)
+      console.log('🗑️ Profesional eliminado:', index, 'Restantes:', updated.length)
+      return updated
+    })
   }, [])
 
+  // Métodos de datos - Servicios
   const addService = useCallback((suggested?: Partial<ServiceData>) => {
     const newService: ServiceData = {
-      name: suggested?.name || '',
-      description: suggested?.description || '',
-      category: suggested?.category || '',
-      duration_minutes: suggested?.duration_minutes || 30,
-      price: suggested?.price || 0,
-      buffer_time_before: suggested?.buffer_time_before || 0,
-      buffer_time_after: suggested?.buffer_time_after || 10,
-      is_active: suggested?.is_active ?? true,
-      requires_preparation: suggested?.requires_preparation ?? false
+      name: '',
+      description: '',
+      category: '',
+      duration_minutes: 60,
+      price: 0,
+      buffer_time_before: 0,
+      buffer_time_after: 10,
+      is_active: true,
+      requires_preparation: false,
+      ...suggested
     }
-    setServices(prev => [...prev, newService])
+    
+    setServices(prev => {
+      const updated = [...prev, newService]
+      console.log('🔧 Servicio agregado, total:', updated.length)
+      return updated
+    })
   }, [])
 
   const updateService = useCallback((index: number, data: Partial<ServiceData>) => {
     setServices(prev => {
       const updated = [...prev]
-      if (updated[index]) {
         updated[index] = { ...updated[index], ...data }
-      }
+      console.log('🔧 Servicio actualizado:', index, data)
       return updated
     })
   }, [])
 
   const removeService = useCallback((index: number) => {
-    setServices(prev => prev.filter((_, i) => i !== index))
+    setServices(prev => {
+      const updated = prev.filter((_, i) => i !== index)
+      console.log('🗑️ Servicio eliminado:', index, 'Restantes:', updated.length)
+      return updated
+    })
   }, [])
 
   const loadSuggestedServices = useCallback((industryType: string) => {
     const suggested = OnboardingService.getSuggestedServices(industryType)
     setServices(suggested)
+    console.log('💡 Servicios sugeridos cargados para:', industryType, 'Cantidad:', suggested.length)
   }, [])
 
-  const validateCurrentData = useCallback(() => {
+  // Validación
+  const canProceedFromStep = useCallback((step: number): boolean => {
+    switch (step) {
+      case 0: // Plan selection
+        return !!planInfo
+      case 1: // Registration
+        return !!registrationToken && !!planInfo
+      case 2: // Team setup
+        return professionals.length > 0 && professionals.every(p => p.name && p.email)
+      case 3: // Services setup
+        return services.length > 0 && services.every(s => s.name && s.price > 0 && s.duration_minutes > 0)
+      case 4: // Organization config
+        return !!(organizationData.name && organizationData.email && organizationData.phone)
+      case 5: // Welcome/Complete
+        return true
+      default:
+        return false
+    }
+  }, [planInfo, registrationToken, professionals, services, organizationData])
+
+  const validateCurrentData = useCallback((): { isValid: boolean; errors: string[] } => {
     return OnboardingService.validateOnboardingData({
       organization: organizationData,
       professionals,
@@ -439,34 +386,15 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     })
   }, [organizationData, professionals, services])
 
-  // Finalización del onboarding
+  // Completar onboarding - ALINEADO CON BACKEND
   const completeOnboarding = useCallback(async () => {
     if (!registrationToken) {
-      throw new Error('No se encontró token de registro')
+      throw new Error('No hay token de registro válido')
     }
 
     setIsCompleting(true)
+    
     try {
-      // Cargar datos del equipo desde localStorage
-      const teamSetupData = localStorage.getItem('team_setup_data')
-      let teamMembers: TeamMemberData[] = []
-      
-      console.log('📂 Datos raw de localStorage team_setup_data:', teamSetupData)
-      
-      if (teamSetupData) {
-        const parsedTeamData = JSON.parse(teamSetupData)
-        console.log('📋 Datos parseados del equipo:', parsedTeamData)
-        teamMembers = parsedTeamData.teamMembers || []
-      } else {
-        console.warn('⚠️ No se encontraron datos del equipo en localStorage')
-      }
-
-      console.log('👥 TeamMembers encontrados:', teamMembers)
-
-      // Filtrar solo los miembros que NO son owner (ya que el owner se crea automáticamente en el backend)
-      const professionalMembers = teamMembers.filter((member: TeamMemberData) => member.role !== 'owner')
-      console.log('👨‍💼 Professional members (sin owner):', professionalMembers)
-
       // Validar datos básicos antes de enviar
       if (!organizationData.name) {
         throw new Error('Falta el nombre de la organización')
@@ -477,10 +405,14 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       if (!organizationData.phone) {
         throw new Error('Falta el teléfono de la organización')
       }
+      if (professionals.length === 0) {
+        throw new Error('Debe agregar al menos un profesional')
+      }
       if (services.length === 0) {
         throw new Error('Debe agregar al menos un servicio')
       }
 
+      // Preparar datos en el formato exacto que espera el backend
       const onboardingData = {
         registration_token: registrationToken,
         organization: {
@@ -492,15 +424,13 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
           city: organizationData.city || '',
           country: organizationData.country || 'Chile'
         },
-        professionals: professionalMembers.map((member: TeamMemberData) => ({
-          name: member.name,
-          email: member.email,
-          phone: member.phone || '',
-          role: member.role, // Incluir el rol específico (professional, reception, staff)
-          specialty: member.specialty || '',
-          color_code: member.color_code || '#4CAF50',
-          is_professional: member.is_professional || false,
-          accepts_walk_ins: member.accepts_walk_ins || false
+        professionals: professionals.map(prof => ({
+          name: prof.name,
+          email: prof.email,
+          phone: prof.phone || '',
+          specialty: prof.specialty || '',
+          color_code: prof.color_code || '#4CAF50',
+          accepts_walk_ins: prof.accepts_walk_ins !== undefined ? prof.accepts_walk_ins : true
         })),
         services: services.map(serv => ({
           name: serv.name,
@@ -515,8 +445,11 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         }))
       }
 
-      console.log('🚀 Datos finales a enviar al backend:', JSON.stringify(onboardingData, null, 2))
-      await OnboardingService.completeOnboarding(onboardingData)
+      console.log('🚀 Enviando datos de onboarding al backend:', JSON.stringify(onboardingData, null, 2))
+      
+      const result = await OnboardingService.completeOnboarding(onboardingData)
+      
+      console.log('✅ Onboarding completado exitosamente:', result)
       
       // Limpiar datos temporales y progreso guardado
       OnboardingService.clearOnboardingData()
@@ -528,12 +461,12 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       
       markStepCompleted(currentStep)
     } catch (error) {
-      console.error('Error completando onboarding:', error)
+      console.error('❌ Error completando onboarding:', error)
       throw error
     } finally {
       setIsCompleting(false)
     }
-  }, [registrationToken, organizationData, services, markStepCompleted, currentStep])
+  }, [registrationToken, organizationData, professionals, services, markStepCompleted, currentStep])
 
   // Reset del onboarding
   const resetOnboarding = useCallback(() => {

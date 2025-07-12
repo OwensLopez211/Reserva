@@ -140,14 +140,14 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({ organization, viewM
             {/* Botones mejorados */}
             <div className="flex gap-4">
               <Link
-                to={`/marketplace/org/${organization.slug}`}
+                to={`/book/${organization.slug}`}
                 className="flex-1 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 px-6 py-3 rounded-xl font-semibold transition-all duration-300 text-center hover:shadow-md flex items-center justify-center group"
               >
                 Ver perfil
                 <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link
-                to={`/marketplace/org/${organization.slug}/booking`}
+                to={`/book/${organization.slug}?autobook=true`}
                 className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 text-center hover:shadow-lg hover:shadow-emerald-200 flex items-center justify-center group"
               >
                 Reservar ahora
@@ -277,14 +277,14 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({ organization, viewM
         {/* Botones siempre en la parte inferior */}
         <div className="flex gap-4 mt-auto">
           <Link
-            to={`/marketplace/org/${organization.slug}`}
+            to={`/book/${organization.slug}`}
             className="flex-1 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 px-6 py-3 rounded-xl font-semibold transition-all duration-300 text-center hover:shadow-md flex items-center justify-center group h-12"
           >
             <span className="truncate">Ver perfil</span>
             <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform flex-shrink-0" />
           </Link>
           <Link
-            to={`/marketplace/org/${organization.slug}/booking`}
+            to={`/book/${organization.slug}?autobook=true`}
             className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 text-center hover:shadow-lg hover:shadow-emerald-200 flex items-center justify-center group h-12"
           >
             <span className="truncate">Reservar</span>

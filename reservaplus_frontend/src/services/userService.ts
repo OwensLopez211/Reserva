@@ -28,8 +28,11 @@ export interface CreateUserData {
   phone?: string;
   role: 'admin' | 'professional' | 'reception' | 'staff';
   is_professional?: boolean;
-  password: string;
-  confirm_password: string;
+}
+
+export interface CreateUserResponse extends User {
+  temp_password?: string;
+  message?: string;
 }
 
 export interface UpdateUserData {
@@ -116,9 +119,22 @@ class UserService {
   }
 
   /**
+   * Verificar si un email ya existe en la plataforma
+   */
+  async checkEmailExists(email: string): Promise<boolean> {
+    try {
+      const response = await api.get(`/api/auth/check-email/?email=${encodeURIComponent(email)}`);
+      return response.data.exists;
+    } catch (error) {
+      console.error('Error verificando email:', error);
+      return false;
+    }
+  }
+
+  /**
    * Crear un nuevo usuario
    */
-  async createUser(userData: CreateUserData): Promise<User> {
+  async createUser(userData: CreateUserData): Promise<CreateUserResponse> {
     const response = await api.post('/api/auth/organization/create/', userData);
     return response.data;
   }
@@ -253,13 +269,22 @@ class UserService {
       }
     }
 
-    if ('password' in userData) {
-      const createData = userData as CreateUserData;
-      if (!createData.password || createData.password.length < 6) {
-        errors.push('La contraseña debe tener al menos 6 caracteres');
-      }
-      if (createData.password !== createData.confirm_password) {
-        errors.push('Las contraseñas no coinciden');
+    if ('username' in userData && userData.username) {
+      if (!userData.username.trim()) {
+        errors.push('El nombre de usuario es requerido');
+      } else {
+        // Validar que no contenga acentos
+        if (this.hasAccents(userData.username)) {
+          errors.push('El nombre de usuario no puede contener acentos');
+        }
+        // Validar caracteres permitidos
+        if (!/^[a-zA-Z0-9._-]+$/.test(userData.username)) {
+          errors.push('El nombre de usuario solo puede contener letras, números, puntos, guiones y guiones bajos');
+        }
+        // Validar longitud mínima
+        if (userData.username.length < 3) {
+          errors.push('El nombre de usuario debe tener al menos 3 caracteres');
+        }
       }
     }
 
@@ -267,12 +292,31 @@ class UserService {
   }
 
   /**
+   * Verificar si una cadena contiene acentos
+   */
+  private hasAccents(str: string): boolean {
+    return str.normalize('NFD').length !== str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').length;
+  }
+
+  /**
    * Generar username automáticamente basado en nombre y apellido
    */
   generateUsername(firstName: string, lastName: string): string {
-    const cleanFirst = firstName.toLowerCase().trim().replace(/\s+/g, '');
-    const cleanLast = lastName.toLowerCase().trim().replace(/\s+/g, '');
-    return `${cleanFirst}.${cleanLast}`;
+    const cleanFirst = this.removeAccents(firstName.toLowerCase().trim().replace(/\s+/g, ''))
+      .replace(/[^a-zA-Z0-9]/g, ''); // Remover caracteres especiales
+    const cleanLast = this.removeAccents(lastName.toLowerCase().trim().replace(/\s+/g, ''))
+      .replace(/[^a-zA-Z0-9]/g, ''); // Remover caracteres especiales
+    
+    // Asegurar que tenga al menos 3 caracteres
+    const username = `${cleanFirst}.${cleanLast}`;
+    return username.length >= 3 ? username : `${username}.user`;
+  }
+
+  /**
+   * Remover acentos de una cadena
+   */
+  private removeAccents(str: string): string {
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   }
 
   /**

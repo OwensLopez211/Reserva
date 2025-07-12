@@ -44,7 +44,11 @@ const TeamSetupPage: React.FC = () => {
     organizationData,
     registrationToken,
     markStepCompleted,
-    setCurrentStep
+    setCurrentStep,
+    addProfessional,
+    updateProfessional,
+    removeProfessional,
+    professionals
   } = useOnboarding()
   
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -362,7 +366,31 @@ const TeamSetupPage: React.FC = () => {
     setIsLoading(true)
     
     try {
-      // Guardar datos del equipo para el siguiente paso
+      // Actualizar el contexto de onboarding con los datos de los profesionales
+      // Primero, limpiar profesionales existentes (si los hay)
+      while (professionals.length > 0) {
+        removeProfessional(0)
+      }
+      
+      // Agregar solo los profesionales (no owners, receptionist, staff)
+      const professionalsFromTeam = teamMembers.filter(member => member.role === 'professional')
+      professionalsFromTeam.forEach(() => {
+        addProfessional()
+      })
+      
+      // Actualizar cada profesional con sus datos
+      professionalsFromTeam.forEach((member, index) => {
+        updateProfessional(index, {
+          name: member.name,
+          email: member.email,
+          phone: member.phone,
+          specialty: member.specialty,
+          color_code: member.color_code,
+          accepts_walk_ins: member.accepts_walk_ins
+        })
+      })
+      
+      // Guardar datos del equipo para el siguiente paso (mantenemos para compatibilidad)
       const teamData = {
         teamMembers: teamMembers.map(member => ({
           name: member.name,
@@ -378,6 +406,11 @@ const TeamSetupPage: React.FC = () => {
       
       localStorage.setItem('team_setup_data', JSON.stringify(teamData))
       
+      console.log('✅ Equipo actualizado en contexto:', {
+        profesionales: professionalsFromTeam.length,
+        totalMiembros: teamMembers.length
+      })
+      
       // Marcar paso como completado
       markStepCompleted(2)
       setCurrentStep(3)
@@ -390,7 +423,7 @@ const TeamSetupPage: React.FC = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [validateForm, teamMembers, markStepCompleted, setCurrentStep, navigate])
+  }, [validateForm, teamMembers, markStepCompleted, setCurrentStep, navigate, professionals, addProfessional, updateProfessional, removeProfessional])
 
   const handleBack = useCallback(() => {
     navigate('/onboarding/register')
@@ -533,7 +566,7 @@ const TeamSetupPage: React.FC = () => {
                             <Crown className="w-3 h-3 mr-1" />
                             Propietario
                           </span>
-                        )}
+                      )}
                     </div>
                   </div>
 
@@ -665,9 +698,9 @@ const TeamSetupPage: React.FC = () => {
                     <p className="text-sm text-amber-800 font-medium flex items-center">
                       <AlertCircle className="w-4 h-4 mr-2" />
                       Debes agregar al menos 1 profesional para continuar
-                    </p>
-                  </div>
-                )}
+                </p>
+              </div>
+            )}
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -313,6 +313,34 @@ class Client(models.Model):
     email_notifications = models.BooleanField(default=True)
     sms_notifications = models.BooleanField(default=False)
     
+    # NUEVO: Campos para clientes públicos
+    CLIENT_TYPE_CHOICES = [
+        ('internal', 'Cliente Interno'),  # Creado por el staff
+        ('registered', 'Cliente Registrado'),  # Tiene cuenta propia
+        ('guest', 'Cliente Invitado'),  # Sin cuenta, solo para booking
+    ]
+    client_type = models.CharField(
+        max_length=20,
+        choices=CLIENT_TYPE_CHOICES,
+        default='internal',
+        verbose_name="Tipo de Cliente"
+    )
+    
+    # Para clientes registrados
+    password_hash = models.CharField(max_length=128, blank=True, null=True)
+    email_verified = models.BooleanField(default=False)
+    verification_token = models.CharField(max_length=100, blank=True, null=True)
+    
+    # Para clientes guest (temporal)
+    is_guest = models.BooleanField(default=False)
+    guest_token = models.CharField(max_length=100, blank=True, null=True)
+    guest_expires_at = models.DateTimeField(null=True, blank=True)
+    
+    # Información adicional para booking público
+    address = models.TextField(blank=True, verbose_name="Dirección")
+    emergency_contact = models.CharField(max_length=200, blank=True, verbose_name="Contacto de Emergencia")
+    marketing_consent = models.BooleanField(default=False, verbose_name="Acepta Marketing")
+    
     # Estados
     is_active = models.BooleanField(default=True)
     
@@ -331,3 +359,72 @@ class Client(models.Model):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
+    
+    def set_password(self, raw_password):
+        """Establecer contraseña para cliente registrado"""
+        from django.contrib.auth.hashers import make_password
+        self.password_hash = make_password(raw_password)
+    
+    def check_password(self, raw_password):
+        """Verificar contraseña para cliente registrado"""
+        from django.contrib.auth.hashers import check_password
+        return check_password(raw_password, self.password_hash)
+    
+    def generate_verification_token(self):
+        """Generar token de verificación de email"""
+        import secrets
+        self.verification_token = secrets.token_urlsafe(32)
+        return self.verification_token
+    
+    def generate_guest_token(self):
+        """Generar token temporal para cliente guest"""
+        import secrets
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        self.guest_token = secrets.token_urlsafe(32)
+        self.guest_expires_at = timezone.now() + timedelta(hours=24)  # Expira en 24 horas
+        return self.guest_token
+    
+    def is_guest_token_valid(self):
+        """Verificar si el token de guest es válido"""
+        from django.utils import timezone
+        return (
+            self.guest_token and 
+            self.guest_expires_at and 
+            timezone.now() < self.guest_expires_at
+        )
+    
+    @classmethod
+    def create_guest_client(cls, organization, first_name, last_name, email, phone, **extra_data):
+        """Crear cliente guest temporal"""
+        client = cls(
+            organization=organization,
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            phone=phone,
+            client_type='guest',
+            is_guest=True,
+            **extra_data
+        )
+        client.generate_guest_token()
+        client.save()
+        return client
+    
+    @classmethod
+    def create_registered_client(cls, organization, first_name, last_name, email, phone, password, **extra_data):
+        """Crear cliente registrado"""
+        client = cls(
+            organization=organization,
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            phone=phone,
+            client_type='registered',
+            **extra_data
+        )
+        client.set_password(password)
+        client.generate_verification_token()
+        client.save()
+        return client

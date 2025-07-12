@@ -47,7 +47,7 @@ class UserRegistrationCreateSerializer(serializers.ModelSerializer):
     """
     Serializer para crear un registro de usuario temporal
     """
-    plan_id = serializers.UUIDField(write_only=True, source='selected_plan.id')
+    plan_id = serializers.UUIDField(write_only=True)
     user_data = serializers.DictField(write_only=True)
     
     class Meta:
@@ -90,7 +90,7 @@ class UserRegistrationCreateSerializer(serializers.ModelSerializer):
         from django.utils import timezone
         from datetime import timedelta
         
-        plan_id = validated_data.pop('selected_plan')['id']
+        plan_id = validated_data.pop('plan_id')
         user_data = validated_data.pop('user_data')
         
         # Generar token temporal

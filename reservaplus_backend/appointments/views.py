@@ -253,7 +253,14 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         # Filtros adicionales
         professional_id = request.query_params.get('professional_id')
         if professional_id:
-            queryset = queryset.filter(professional_id=professional_id)
+            try:
+                # Verificar si es un UUID válido
+                import uuid
+                uuid.UUID(professional_id)
+                queryset = queryset.filter(professional_id=professional_id)
+            except ValueError:
+                # Si no es un UUID válido, no filtrar (o devolver error)
+                pass
         
         service_id = request.query_params.get('service_id')
         if service_id:
@@ -289,7 +296,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
 class AvailabilityView(APIView):
     """
-    Vista para calcular disponibilidad de profesionales
+    Vista para calcular disponibilidad de profesionales usando el sistema de horarios
     """
     permission_classes = [IsAuthenticated]
     
@@ -335,91 +342,305 @@ class AvailabilityView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Duración del servicio
-        service_duration = int(duration) if duration else service.total_duration_minutes
+        # Importar el servicio de disponibilidad
+        from schedule.services import MultiProfessionalAvailabilityService
         
-        # Obtener profesionales que pueden realizar el servicio
-        professionals_query = service.professionals.filter(is_active=True)
-        if professional_id:
-            professionals_query = professionals_query.filter(id=professional_id)
+        # Obtener profesionales específicos si se especifica
+        professional_ids = [professional_id] if professional_id else None
         
-        professionals = list(professionals_query)
+        # Calcular disponibilidad usando el nuevo servicio
+        availability_by_professional = MultiProfessionalAvailabilityService.get_available_slots_for_service(
+            service, target_date, professional_ids
+        )
         
-        if not professionals:
-            return Response(
-                {'error': 'No hay profesionales disponibles para este servicio'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        # Calcular disponibilidad para cada profesional
-        availability_slots = []
-        
-        for professional in professionals:
-            slots = self._calculate_availability_for_professional(
-                professional, target_date, service_duration, service
-            )
-            availability_slots.extend(slots)
+        # Consolidar todos los slots
+        all_slots = []
+        for prof_id, slots in availability_by_professional.items():
+            all_slots.extend(slots)
         
         # Ordenar por hora
-        availability_slots.sort(key=lambda x: x['start_time'])
+        all_slots.sort(key=lambda x: x['start_datetime'])
+        
+        # Formatear para compatibilidad con la API existente
+        formatted_slots = []
+        for slot in all_slots:
+            formatted_slots.append({
+                'start_time': slot['start_datetime'],
+                'end_time': slot['end_datetime'],
+                'duration_minutes': slot['duration_minutes'],
+                'is_available': slot['is_available'],
+                'professional_id': slot['professional_id'],
+                'professional_name': slot['professional_name'],
+                'service_id': str(service.id),
+                'service_name': service.name,
+                'conflict_reason': slot.get('conflict_reason')
+            })
         
         return Response({
             'date': date_str,
             'service': {
                 'id': str(service.id),
                 'name': service.name,
-                'duration_minutes': service_duration
+                'duration_minutes': int(duration) if duration else service.total_duration_minutes
             },
-            'slots': availability_slots
+            'slots': formatted_slots,
+            'professionals_summary': {
+                prof_id: {
+                    'total_slots': len(slots),
+                    'available_slots': len([s for s in slots if s['is_available']]),
+                    'professional_name': slots[0]['professional_name'] if slots else None
+                }
+                for prof_id, slots in availability_by_professional.items()
+            }
         })
+
+
+class SmartAvailabilityView(APIView):
+    """
+    Vista avanzada para obtener disponibilidad inteligente
+    """
+    permission_classes = [IsAuthenticated]
     
-    def _calculate_availability_for_professional(self, professional, date, duration_minutes, service):
+    def get(self, request):
         """
-        Calcular slots disponibles para un profesional específico
+        Obtener disponibilidad inteligente con múltiples opciones
+        
+        Parámetros:
+        - service_id: ID del servicio (requerido)
+        - professional_id: ID del profesional (opcional)
+        - start_date: Fecha inicio búsqueda (opcional, default: hoy)
+        - end_date: Fecha fin búsqueda (opcional, default: +30 días)
+        - max_slots: Máximo slots a retornar (opcional, default: 20)
+        - mode: Modo de búsqueda ('next_available', 'date_range', 'earliest')
         """
-        # Horario de trabajo (simplificado - asumimos 9:00 a 18:00)
-        # TODO: Implementar horarios personalizados por profesional
-        work_start = time(9, 0)
-        work_end = time(18, 0)
+        service_id = request.query_params.get('service_id')
+        professional_id = request.query_params.get('professional_id')
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+        max_slots = int(request.query_params.get('max_slots', 20))
+        mode = request.query_params.get('mode', 'next_available')
         
-        # Obtener citas existentes del profesional para la fecha
-        existing_appointments = Appointment.objects.filter(
-            professional=professional,
-            start_datetime__date=date,
-            status__in=['pending', 'confirmed', 'checked_in', 'in_progress']
-        ).order_by('start_datetime')
+        if not service_id:
+            return Response(
+                {'error': 'service_id es requerido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
-        # Generar slots cada 15 minutos
-        slots = []
-        current_time = datetime.combine(date, work_start)
-        end_time = datetime.combine(date, work_end)
+        # Obtener servicio
+        try:
+            service = Service.objects.get(
+                id=service_id, 
+                organization=request.user.organization
+            )
+        except Service.DoesNotExist:
+            return Response(
+                {'error': 'Servicio no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
         
-        while current_time + timedelta(minutes=duration_minutes) <= end_time:
-            slot_end = current_time + timedelta(minutes=duration_minutes)
+        # Importar servicios
+        from schedule.services import MultiProfessionalAvailabilityService, AvailabilityCalculationService
+        
+        # Determinar profesionales
+        professional_ids = [professional_id] if professional_id else None
+        
+        if mode == 'earliest':
+            # Buscar el slot más temprano disponible
+            earliest_slot = MultiProfessionalAvailabilityService.get_earliest_available_slot(
+                service, professional_ids, days_ahead=30
+            )
             
-            # Verificar si el slot está libre
-            is_available = True
-            for appointment in existing_appointments:
-                if (current_time < appointment.end_datetime and 
-                    slot_end > appointment.start_datetime):
-                    is_available = False
-                    break
-            
-            slots.append({
-                'start_time': current_time,
-                'end_time': slot_end,
-                'duration_minutes': duration_minutes,
-                'is_available': is_available,
-                'professional_id': str(professional.id),
-                'professional_name': professional.name,
-                'service_id': str(service.id),
-                'service_name': service.name
+            return Response({
+                'mode': mode,
+                'service': {
+                    'id': str(service.id),
+                    'name': service.name,
+                    'duration_minutes': service.total_duration_minutes
+                },
+                'earliest_slot': earliest_slot
             })
-            
-            # Avanzar 15 minutos
-            current_time += timedelta(minutes=15)
         
-        return slots
+        elif mode == 'date_range':
+            # Búsqueda en rango de fechas
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else timezone.now().date()
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else start_date + timedelta(days=30)
+            except ValueError:
+                return Response(
+                    {'error': 'Formato de fecha inválido. Use YYYY-MM-DD'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Obtener resumen de disponibilidad
+            availability_summary = MultiProfessionalAvailabilityService.get_availability_summary(
+                service, start_date, end_date, professional_ids
+            )
+            
+            return Response({
+                'mode': mode,
+                'service': {
+                    'id': str(service.id),
+                    'name': service.name,
+                    'duration_minutes': service.total_duration_minutes
+                },
+                'date_range': {
+                    'start_date': start_date.isoformat(),
+                    'end_date': end_date.isoformat()
+                },
+                'availability_summary': availability_summary
+            })
+        
+        else:  # mode == 'next_available'
+            # Obtener próximos slots disponibles
+            if professional_id:
+                try:
+                    professional = Professional.objects.get(
+                        id=professional_id,
+                        organization=request.user.organization
+                    )
+                    availability_service = AvailabilityCalculationService(professional)
+                    next_slots = availability_service.get_next_available_slots(
+                        service, days_ahead=30, max_slots=max_slots
+                    )
+                except Professional.DoesNotExist:
+                    return Response(
+                        {'error': 'Profesional no encontrado'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            else:
+                # Buscar en todos los profesionales que pueden realizar el servicio
+                next_slots = []
+                professionals = service.professionals.filter(is_active=True)[:5]  # Limitar a 5 profesionales
+                
+                for professional in professionals:
+                    availability_service = AvailabilityCalculationService(professional)
+                    prof_slots = availability_service.get_next_available_slots(
+                        service, days_ahead=30, max_slots=max_slots//len(professionals)
+                    )
+                    next_slots.extend(prof_slots)
+                
+                # Ordenar por fecha
+                next_slots.sort(key=lambda x: x['start_datetime'])
+                next_slots = next_slots[:max_slots]
+            
+            return Response({
+                'mode': mode,
+                'service': {
+                    'id': str(service.id),
+                    'name': service.name,
+                    'duration_minutes': service.total_duration_minutes
+                },
+                'next_available_slots': next_slots
+            })
+
+
+class ConflictDetectionView(APIView):
+    """
+    Vista para detectar conflictos de horarios
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Detectar conflictos para una cita propuesta
+        
+        Body:
+        {
+            "professional_id": "uuid",
+            "service_id": "uuid",
+            "start_datetime": "2024-01-15T10:00:00Z",
+            "exclude_appointment_id": "uuid" (opcional, para actualizaciones)
+        }
+        """
+        professional_id = request.data.get('professional_id')
+        service_id = request.data.get('service_id')
+        start_datetime_str = request.data.get('start_datetime')
+        exclude_appointment_id = request.data.get('exclude_appointment_id')
+        
+        if not all([professional_id, service_id, start_datetime_str]):
+            return Response(
+                {'error': 'professional_id, service_id y start_datetime son requeridos'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            start_datetime = datetime.fromisoformat(start_datetime_str.replace('Z', '+00:00'))
+        except ValueError:
+            return Response(
+                {'error': 'Formato de fecha inválido. Use ISO format'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Obtener objetos
+        try:
+            professional = Professional.objects.get(
+                id=professional_id,
+                organization=request.user.organization
+            )
+            service = Service.objects.get(
+                id=service_id,
+                organization=request.user.organization
+            )
+        except (Professional.DoesNotExist, Service.DoesNotExist):
+            return Response(
+                {'error': 'Profesional o servicio no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Verificar disponibilidad
+        from schedule.services import AvailabilityCalculationService
+        
+        availability_service = AvailabilityCalculationService(professional)
+        is_available, reason = availability_service.is_available_at_time(start_datetime, service)
+        
+        conflicts = []
+        
+        if not is_available:
+            conflicts.append({
+                'type': 'schedule_conflict',
+                'reason': reason,
+                'severity': 'high'
+            })
+        
+        # Verificar solapamiento con citas existentes
+        end_datetime = start_datetime + timedelta(minutes=service.total_duration_minutes)
+        overlapping_appointments = Appointment.objects.filter(
+            professional=professional,
+            start_datetime__lt=end_datetime,
+            end_datetime__gt=start_datetime,
+            status__in=['pending', 'confirmed', 'checked_in', 'in_progress']
+        )
+        
+        if exclude_appointment_id:
+            overlapping_appointments = overlapping_appointments.exclude(id=exclude_appointment_id)
+        
+        for appointment in overlapping_appointments:
+            conflicts.append({
+                'type': 'appointment_conflict',
+                'reason': f'Conflicto con cita de {appointment.client.full_name}',
+                'severity': 'high',
+                'conflicting_appointment': {
+                    'id': str(appointment.id),
+                    'client_name': appointment.client.full_name,
+                    'service_name': appointment.service.name,
+                    'start_datetime': appointment.start_datetime.isoformat(),
+                    'end_datetime': appointment.end_datetime.isoformat()
+                }
+            })
+        
+        return Response({
+            'has_conflicts': len(conflicts) > 0,
+            'conflicts': conflicts,
+            'proposed_appointment': {
+                'professional_id': professional_id,
+                'professional_name': professional.name,
+                'service_id': service_id,
+                'service_name': service.name,
+                'start_datetime': start_datetime.isoformat(),
+                'end_datetime': end_datetime.isoformat(),
+                'duration_minutes': service.total_duration_minutes
+            }
+        })
 
 
 class AppointmentHistoryViewSet(viewsets.ReadOnlyModelViewSet):

@@ -11,10 +11,10 @@ import {
   BarChart3,
   Clock,
   User,
-  DollarSign,
   CreditCard,
   Menu,
-  X
+  X,
+  Scissors
 } from 'lucide-react'
 
 interface NavigationItem {
@@ -69,27 +69,10 @@ const Navigation: React.FC = () => {
           { name: 'Clientes', href: '/app/clients', icon: Users },
           {
             name: 'Servicios',
-            icon: Settings,
+            icon: Scissors,
             dropdown: [
               { name: 'Gestionar Servicios', href: '/app/services', description: 'Crear y editar servicios' },
               { name: 'Horarios', href: '/app/schedules', description: 'Configurar horarios de atención' }
-            ]
-          },
-          {
-            name: 'Ventas',
-            icon: DollarSign,
-            dropdown: [
-              { name: 'Historial de Ventas', href: '/app/sales', description: 'Ver todas las transacciones' },
-              { name: 'Promociones', href: '/app/promotions', description: 'Crear ofertas especiales' }
-            ]
-          },
-          {
-            name: 'Reportes',
-            icon: BarChart3,
-            dropdown: [
-              { name: 'Análisis de Ventas', href: '/app/reports/sales', description: 'Reportes financieros' },
-              { name: 'Análisis de Clientes', href: '/app/reports/clients', description: 'Comportamiento de clientes' },
-              { name: 'Rendimiento del Equipo', href: '/app/reports/staff', description: 'Productividad del personal' }
             ]
           },
           {
@@ -109,25 +92,10 @@ const Navigation: React.FC = () => {
           { name: 'Clientes', href: '/app/clients', icon: Users },
           {
             name: 'Servicios',
-            icon: Settings,
+            icon: Scissors,
             dropdown: [
               { name: 'Gestionar Servicios', href: '/app/services', description: 'Crear y editar servicios' },
               { name: 'Horarios', href: '/app/schedules', description: 'Configurar horarios de atención' }
-            ]
-          },
-          {
-            name: 'Ventas',
-            icon: DollarSign,
-            dropdown: [
-              { name: 'Historial de Ventas', href: '/app/sales', description: 'Ver todas las transacciones' }
-            ]
-          },
-          {
-            name: 'Reportes',
-            icon: BarChart3,
-            dropdown: [
-              { name: 'Análisis de Ventas', href: '/app/reports/sales', description: 'Reportes financieros' },
-              { name: 'Análisis de Clientes', href: '/app/reports/clients', description: 'Comportamiento de clientes' }
             ]
           }
         ]
