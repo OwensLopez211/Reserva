@@ -29,7 +29,8 @@ class Appointment(models.Model):
     )
     service = models.ForeignKey(
         Service, 
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
         related_name='appointments'
     )
     client = models.ForeignKey(
@@ -112,7 +113,8 @@ class Appointment(models.Model):
         ]
         
     def __str__(self):
-        return f"{self.client.full_name} - {self.service.name} - {self.start_datetime.strftime('%Y-%m-%d %H:%M')}"
+        service_name = self.service.name if self.service else "Servicio eliminado"
+        return f"{self.client.full_name} - {service_name} - {self.start_datetime.strftime('%Y-%m-%d %H:%M')}"
     
     def clean(self):
         """Validaciones del modelo"""
@@ -129,7 +131,7 @@ class Appointment(models.Model):
             if abs(calculated_duration - self.duration_minutes) > 1:  # 1 minuto de tolerancia
                 raise ValidationError("La duración no coincide con las horas de inicio y fin")
         
-        # Validar que el profesional pueda realizar el servicio
+        # Validar que el profesional pueda realizar el servicio (solo si el servicio existe)
         if self.professional and self.service:
             if not self.service.professionals.filter(id=self.professional.id).exists():
                 raise ValidationError("El profesional seleccionado no puede realizar este servicio")
@@ -157,11 +159,11 @@ class Appointment(models.Model):
         if not self.end_datetime and self.start_datetime and self.duration_minutes:
             self.end_datetime = self.start_datetime + timedelta(minutes=self.duration_minutes)
         
-        # Establecer duración si no está definida
+        # Establecer duración si no está definida (solo si el servicio existe)
         if not self.duration_minutes and self.service:
             self.duration_minutes = self.service.total_duration_minutes
         
-        # Establecer precio si no está definido
+        # Establecer precio si no está definido (solo si el servicio existe)
         if not self.price and self.service:
             self.price = self.service.price
         
@@ -330,7 +332,7 @@ class RecurringAppointment(models.Model):
     # Relaciones
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
     professional = models.ForeignKey(Professional, on_delete=models.CASCADE)
-    service = models.ForeignKey(Service, on_delete=models.CASCADE)
+    service = models.ForeignKey(Service, on_delete=models.SET_NULL, null=True)
     client = models.ForeignKey(Client, on_delete=models.CASCADE)
     
     # Configuración de recurrencia
@@ -365,7 +367,8 @@ class RecurringAppointment(models.Model):
         db_table = 'appointments_recurring'
         
     def __str__(self):
-        return f"{self.client.full_name} - {self.service.name} - {self.get_frequency_display()}"
+        service_name = self.service.name if self.service else "Servicio eliminado"
+        return f"{self.client.full_name} - {service_name} - {self.get_frequency_display()}"
     
     def generate_next_appointments(self, weeks_ahead=4):
         """Generar las próximas citas basadas en la recurrencia"""

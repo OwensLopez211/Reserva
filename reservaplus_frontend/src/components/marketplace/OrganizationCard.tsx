@@ -40,119 +40,110 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({ organization, viewM
 
   if (viewMode === 'list') {
     return (
-      <div className="group bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-100 hover:border-emerald-200 hover:-translate-y-1">
+      <div className="group bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden border border-gray-200 hover:border-gray-300">
         <div className="flex">
-          {/* Imagen mejorada */}
-          <div className="relative w-64 h-56 flex-shrink-0 overflow-hidden">
+          {/* Compact image */}
+          <div className="relative w-48 h-32 flex-shrink-0 overflow-hidden">
             <img
               src={getImageDisplay()}
               alt={organization.name}
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             
-            {/* Badge destacado mejorado */}
+            {/* Featured badge - smaller */}
             {organization.is_featured && (
-              <div className="absolute top-4 left-4 bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-500 text-white px-3 py-1.5 rounded-full text-sm font-bold shadow-lg flex items-center animate-pulse">
-                <Sparkles className="h-4 w-4 mr-1" />
+              <div className="absolute top-2 left-2 bg-yellow-500 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-md flex items-center">
+                <Sparkles className="h-3 w-3 mr-1" />
                 Destacado
               </div>
             )}
             
-            {/* Estado mejorado */}
-            <div className={`absolute top-4 right-4 px-3 py-1.5 rounded-full text-sm font-semibold shadow-lg ${getStatusColor()}`}>
+            {/* Status badge - smaller */}
+            <div className={`absolute top-2 right-2 px-2 py-1 rounded-lg text-xs font-medium shadow-md ${getStatusColor()}`}>
               <div className="flex items-center">
-                <div className={`w-2 h-2 rounded-full mr-2 ${organization.is_open_now ? 'bg-white animate-pulse' : 'bg-gray-300'}`}></div>
+                <div className={`w-1.5 h-1.5 rounded-full mr-1 ${organization.is_open_now ? 'bg-white' : 'bg-gray-300'}`}></div>
                 {organization.is_open_now ? 'Abierto' : 'Cerrado'}
               </div>
             </div>
 
-            {/* Overlay de rating */}
-            <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-lg">
+            {/* Rating overlay - smaller */}
+            <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1 shadow-md">
               <div className="flex items-center">
-                <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                <span className="ml-1 font-bold text-gray-900">{marketplaceService.formatRating(organization.rating)}</span>
+                <Star className="h-3 w-3 text-yellow-400 fill-current" />
+                <span className="ml-1 text-xs font-bold text-gray-900">{marketplaceService.formatRating(organization.rating)}</span>
               </div>
             </div>
           </div>
 
-          {/* Contenido mejorado */}
-          <div className="flex-1 p-8">
-            <div className="flex justify-between items-start mb-6">
-              <div className="flex-1">
-                <h3 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-emerald-600 transition-colors">
-                  {organization.name}
-                </h3>
-                <div className="flex items-center text-gray-600 mb-3">
-                  <MapPin className="h-5 w-5 mr-2 text-emerald-500" />
-                  <span className="font-medium">{getLocationDisplay()}</span>
-                </div>
-                <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getIndustryColor()}`}>
-                  {marketplaceService.getIndustryName(organization.industry_template)}
-                </div>
-              </div>
-              
-              <div className="text-right ml-6">
-                <div className="bg-gradient-to-r from-emerald-50 to-cyan-50 rounded-xl p-4 border border-emerald-200">
-                  <div className="text-sm text-emerald-600 font-medium mb-1">Precio</div>
-                  <div className="text-lg font-bold text-emerald-700">
-                    {marketplaceService.formatPriceRange(organization.min_price, organization.max_price)}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {marketplaceService.formatReviewsCount(organization.total_reviews)}
+          {/* Compact content */}
+          <div className="flex-1 p-4">
+            <div className="flex justify-between items-start">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors truncate pr-4">
+                    {organization.name}
+                  </h3>
+                  <div className="flex items-center text-gray-500 text-sm ml-2">
+                    <MapPin className="h-4 w-4 mr-1 text-gray-400" />
+                    <span className="truncate">{getLocationDisplay()}</span>
                   </div>
                 </div>
-              </div>
-            </div>
+                
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium ${getIndustryColor()}`}>
+                    {marketplaceService.getIndustryName(organization.industry_template)}
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-blue-600">
+                      {marketplaceService.formatPriceRange(organization.min_price, organization.max_price)}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {marketplaceService.formatReviewsCount(organization.total_reviews)}
+                    </div>
+                  </div>
+                </div>
 
-            <p className="text-gray-600 mb-6 text-lg leading-relaxed line-clamp-2">{organization.description}</p>
+                <p className="text-gray-600 text-sm leading-relaxed line-clamp-2 mb-3">{organization.description}</p>
 
-            {/* Servicios mejorados */}
-            <div className="flex flex-wrap gap-2 mb-6">
-              {organization.services.slice(0, 4).map((service, index) => (
-                <span key={index} className="bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 px-4 py-2 rounded-full text-sm font-medium border border-emerald-200 hover:from-emerald-100 hover:to-teal-100 transition-colors">
-                  {service.name}
-                </span>
-              ))}
-              {organization.services.length > 4 && (
-                <span className="text-sm text-gray-500 self-center font-medium">
-                  +{organization.services.length - 4} servicios más
-                </span>
-              )}
-            </div>
+                {/* Compact services */}
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {organization.services.slice(0, 3).map((service, index) => (
+                    <span key={index} className="bg-blue-50 text-blue-700 px-2 py-1 rounded-lg text-xs font-medium border border-blue-200">
+                      {service.name}
+                    </span>
+                  ))}
+                  {organization.services.length > 3 && (
+                    <span className="text-xs text-gray-500 self-center font-medium bg-gray-50 px-2 py-1 rounded-lg">
+                      +{organization.services.length - 3}
+                    </span>
+                  )}
+                </div>
 
-            {/* Información adicional */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-emerald-600">{organization.services_count}</div>
-                <div className="text-sm text-gray-500">Servicios</div>
+                {/* Compact stats and actions */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4 text-xs text-gray-500">
+                    <span><strong className="text-blue-600">{organization.services_count}</strong> servicios</span>
+                    <span><strong className="text-blue-600">{organization.professionals_count}</strong> profesionales</span>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Link
+                      to={`/book/${organization.slug}`}
+                      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-all duration-200 flex items-center"
+                    >
+                      Ver perfil
+                      <ArrowRight className="ml-1 h-3 w-3" />
+                    </Link>
+                    <Link
+                      to={`/book/${organization.slug}?autobook=true`}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-all duration-200 flex items-center shadow-sm"
+                    >
+                      Reservar
+                      <ArrowRight className="ml-1 h-3 w-3" />
+                    </Link>
+                  </div>
+                </div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-emerald-600">{organization.professionals_count}</div>
-                <div className="text-sm text-gray-500">Profesionales</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-emerald-600">{organization.total_reviews}</div>
-                <div className="text-sm text-gray-500">Reseñas</div>
-              </div>
-            </div>
-
-            {/* Botones mejorados */}
-            <div className="flex gap-4">
-              <Link
-                to={`/book/${organization.slug}`}
-                className="flex-1 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 px-6 py-3 rounded-xl font-semibold transition-all duration-300 text-center hover:shadow-md flex items-center justify-center group"
-              >
-                Ver perfil
-                <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <Link
-                to={`/book/${organization.slug}?autobook=true`}
-                className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 text-center hover:shadow-lg hover:shadow-emerald-200 flex items-center justify-center group"
-              >
-                Reservar ahora
-                <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-              </Link>
             </div>
           </div>
         </div>

@@ -428,3 +428,128 @@ class Client(models.Model):
         client.generate_verification_token()
         client.save()
         return client
+
+
+class ClientNote(models.Model):
+    """
+    Notas internas de la organización sobre clientes
+    Estas notas son privadas y solo las ve la organización
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    # Relaciones
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name='client_notes'
+    )
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        related_name='client_notes'
+    )
+    created_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_client_notes'
+    )
+    
+    # Contenido
+    title = models.CharField(max_length=200, verbose_name="Título")
+    content = models.TextField(verbose_name="Contenido")
+    
+    # Categorización
+    CATEGORY_CHOICES = [
+        ('general', 'General'),
+        ('medical', 'Médico'),
+        ('preferences', 'Preferencias'),
+        ('important', 'Importante'),
+        ('follow_up', 'Seguimiento'),
+    ]
+    category = models.CharField(
+        max_length=20,
+        choices=CATEGORY_CHOICES,
+        default='general',
+        verbose_name="Categoría"
+    )
+    
+    # Configuración
+    is_private = models.BooleanField(
+        default=False,
+        verbose_name="Nota Privada",
+        help_text="Solo visible para administradores"
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'organizations_client_note'
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        return f"Nota: {self.title} - {self.client.full_name}"
+
+
+class ClientFile(models.Model):
+    """
+    Archivos asociados a clientes
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    # Relaciones
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name='client_files'
+    )
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        related_name='client_files'
+    )
+    uploaded_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='uploaded_client_files'
+    )
+    
+    # Información del archivo
+    name = models.CharField(max_length=255, verbose_name="Nombre del Archivo")
+    file_path = models.CharField(max_length=500, verbose_name="Ruta del Archivo")
+    file_type = models.CharField(max_length=50, verbose_name="Tipo de Archivo")
+    file_size = models.PositiveIntegerField(verbose_name="Tamaño del Archivo (bytes)")
+    description = models.TextField(blank=True, verbose_name="Descripción")
+    
+    # Categorización
+    CATEGORY_CHOICES = [
+        ('document', 'Documento'),
+        ('image', 'Imagen'),
+        ('medical', 'Médico'),
+        ('other', 'Otro'),
+    ]
+    category = models.CharField(
+        max_length=20,
+        choices=CATEGORY_CHOICES,
+        default='document',
+        verbose_name="Categoría"
+    )
+    
+    # Timestamps
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'organizations_client_file'
+        ordering = ['-uploaded_at']
+        
+    def __str__(self):
+        return f"Archivo: {self.name} - {self.client.full_name}"
+    
+    @property
+    def file_url(self):
+        """URL para acceder al archivo"""
+        # En producción esto sería una URL S3 o similar
+        return f"/media/client_files/{self.file_path}"

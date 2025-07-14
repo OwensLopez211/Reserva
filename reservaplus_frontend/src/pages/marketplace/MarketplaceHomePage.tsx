@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Star, Filter, Grid, List, ChevronDown, Sparkles, TrendingUp, Users, Heart } from 'lucide-react'
+import { Star, Filter, Grid, List, ChevronDown, TrendingUp, Users } from 'lucide-react'
 import OrganizationCard from '../../components/marketplace/OrganizationCard'
 import FilterSidebar from '../../components/marketplace/FilterSidebar'
 import marketplaceService, { MarketplaceOrganization, MarketplaceFilters } from '../../services/marketplaceService'
@@ -153,62 +153,25 @@ const MarketplaceHomePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-blue-50">
-      {/* Hero section mejorado */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-cyan-500 to-blue-600"></div>
-        <div className="absolute inset-0 opacity-10">
-          <div className="h-full w-full bg-emerald-900 bg-opacity-20" style={{backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px'}}></div>
+      {/* Hero section compacto */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900">
+        <div className="absolute inset-0 opacity-5">
+          <div className="h-full w-full" style={{
+            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)',
+            backgroundSize: '30px 30px'
+          }}></div>
         </div>
         
-        <div className="relative max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-20">
-          <div className="text-center text-white">
-            <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
-              Encuentra profesionales
-              <span className="block bg-gradient-to-r from-yellow-300 to-orange-300 bg-clip-text text-transparent">
-                excepcionales
-              </span>
+        <div className="relative max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center">
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
+              Encuentra tu profesional ideal
             </h1>
-            <p className="text-xl md:text-2xl opacity-90 mb-12 max-w-3xl mx-auto leading-relaxed">
-              Conecta con los mejores profesionales de tu ciudad. Reserva fácil, rápido y seguro.
+            <p className="text-lg md:text-xl text-slate-300 max-w-2xl mx-auto">
+              Descubre y conecta con los mejores profesionales verificados en tu ciudad
             </p>
-            
-            {/* Stats mejoradas */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 border border-white/30">
-                <div className="flex items-center justify-center mb-4">
-                  <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center">
-                    <Sparkles className="w-6 h-6 text-yellow-800" />
-                  </div>
-                </div>
-                <div className="text-3xl font-bold mb-2">{totalCount}+</div>
-                <div className="text-lg opacity-90">Profesionales verificados</div>
-              </div>
-              
-              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 border border-white/30">
-                <div className="flex items-center justify-center mb-4">
-                  <div className="w-12 h-12 bg-green-400 rounded-full flex items-center justify-center">
-                    <Star className="w-6 h-6 text-green-800" />
-                  </div>
-                </div>
-                <div className="text-3xl font-bold mb-2">4.8</div>
-                <div className="text-lg opacity-90">Calificación promedio</div>
-              </div>
-              
-              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 border border-white/30">
-                <div className="flex items-center justify-center mb-4">
-                  <div className="w-12 h-12 bg-blue-400 rounded-full flex items-center justify-center">
-                    <Heart className="w-6 h-6 text-blue-800" />
-                  </div>
-                </div>
-                <div className="text-3xl font-bold mb-2">95%</div>
-                <div className="text-lg opacity-90">Clientes satisfechos</div>
-              </div>
-            </div>
           </div>
         </div>
-        
-        {/* Onda decorativa simplificada */}
-        <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-emerald-50 to-transparent"></div>
       </div>
 
       {/* Controles principales mejorados */}

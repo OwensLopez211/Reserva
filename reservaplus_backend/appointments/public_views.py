@@ -271,16 +271,37 @@ class PublicBookingView(APIView):
             "marketing_consent": true
         }
         """
+        print(f"\n=== PUBLIC BOOKING DEBUG ===")
+        print(f"Looking for organization with slug: '{org_slug}'")
+        
         try:
             organization = Organization.objects.get(
                 slug=org_slug,
                 is_active=True
             )
+            print(f"✅ Found organization: {organization.name}")
         except Organization.DoesNotExist:
-            return Response(
-                {'error': 'Organización no encontrada'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            print(f"❌ Organization not found with slug: '{org_slug}'")
+            
+            # Show available organizations for debugging
+            available_orgs = Organization.objects.filter(is_active=True).values_list('slug', flat=True)[:5]
+            print(f"💡 Available organizations: {list(available_orgs)}")
+            
+            # Check if organization exists but is inactive
+            inactive_org = Organization.objects.filter(slug=org_slug).first()
+            if inactive_org:
+                return Response(
+                    {'error': f'La organización "{org_slug}" está inactiva'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            else:
+                return Response(
+                    {'error': f'No se encontró una organización con el identificador "{org_slug}". Organizaciones disponibles: {list(available_orgs)}'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        # Debug: Log received data
+        print(f"DEBUG: Received booking data: {request.data}")
         
         # Validar datos requeridos
         booking_type = request.data.get('booking_type', 'guest')
@@ -289,56 +310,103 @@ class PublicBookingView(APIView):
         start_datetime_str = request.data.get('start_datetime')
         client_data = request.data.get('client_data', {})
         
+        print(f"DEBUG: Parsed fields - booking_type: {booking_type}, service_id: {service_id}, professional_id: {professional_id}, start_datetime: {start_datetime_str}, client_data: {client_data}")
+        
         if not all([service_id, professional_id, start_datetime_str, client_data]):
+            missing_fields = []
+            if not service_id: missing_fields.append('service_id')
+            if not professional_id: missing_fields.append('professional_id')
+            if not start_datetime_str: missing_fields.append('start_datetime')
+            if not client_data: missing_fields.append('client_data')
+            
             return Response(
-                {'error': 'service_id, professional_id, start_datetime y client_data son requeridos'},
+                {'error': f'Campos requeridos faltantes: {", ".join(missing_fields)}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         # Validar datos del cliente
         required_client_fields = ['first_name', 'last_name', 'email', 'phone']
-        if not all(field in client_data for field in required_client_fields):
+        missing_client_fields = [field for field in required_client_fields if field not in client_data]
+        if missing_client_fields:
             return Response(
-                {'error': f'client_data debe incluir: {", ".join(required_client_fields)}'},
+                {'error': f'client_data debe incluir: {", ".join(missing_client_fields)}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        print(f"DEBUG: All validations passed, proceeding with booking creation")
+        
         try:
             # Obtener objetos
+            print(f"DEBUG: Looking for service with ID: {service_id}")
             service = Service.objects.get(
                 id=service_id,
                 organization=organization,
                 is_active=True
             )
+            print(f"DEBUG: Found service: {service.name}")
+            
+            print(f"DEBUG: Looking for professional with ID: {professional_id}")
             professional = Professional.objects.get(
                 id=professional_id,
                 organization=organization,
                 is_active=True
             )
+            print(f"DEBUG: Found professional: {professional.name}")
             
             # Verificar que el profesional puede realizar el servicio
-            if not service.professionals.filter(id=professional.id).exists():
+            print(f"DEBUG: Checking if professional can perform service...")
+            can_perform = service.professionals.filter(id=professional.id).exists()
+            print(f"DEBUG: Professional can perform service: {can_perform}")
+            
+            if not can_perform:
+                print(f"DEBUG: Professional {professional.name} cannot perform service {service.name}")
+                service_professionals = service.professionals.all()
+                print(f"DEBUG: Service professionals: {[p.name for p in service_professionals]}")
                 return Response(
                     {'error': 'El profesional no puede realizar este servicio'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
             # Parsear fecha
-            start_datetime = datetime.fromisoformat(start_datetime_str.replace('Z', '+00:00'))
+            print(f"DEBUG: Parsing datetime: {start_datetime_str}")
+            try:
+                start_datetime = datetime.fromisoformat(start_datetime_str.replace('Z', '+00:00'))
+                print(f"DEBUG: Parsed datetime: {start_datetime}")
+            except Exception as e:
+                print(f"DEBUG: Error parsing datetime: {str(e)}")
+                return Response(
+                    {'error': f'Error en formato de fecha: {str(e)}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
             # Verificar disponibilidad
-            availability_service = AvailabilityCalculationService(professional)
-            is_available, reason = availability_service.is_available_at_time(start_datetime, service)
+            print(f"DEBUG: Checking availability for {start_datetime}")
+            try:
+                availability_service = AvailabilityCalculationService(professional)
+                is_available, reason = availability_service.is_available_at_time(start_datetime, service)
+                print(f"DEBUG: Availability check result: {is_available}, reason: {reason}")
+            except Exception as e:
+                print(f"DEBUG: Error checking availability: {str(e)}")
+                import traceback
+                print(f"DEBUG: Availability error traceback: {traceback.format_exc()}")
+                return Response(
+                    {'error': f'Error verificando disponibilidad: {str(e)}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
             if not is_available:
+                print(f"DEBUG: Slot not available: {reason}")
                 return Response(
                     {'error': f'Horario no disponible: {reason}'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
             with transaction.atomic():
+                print(f"DEBUG: Starting transaction for booking creation")
+                
                 # Crear o obtener cliente
                 if booking_type == 'registered':
+                    print(f"DEBUG: Creating registered client")
                     password = request.data.get('password')
                     if not password:
                         return Response(
@@ -372,32 +440,69 @@ class PublicBookingView(APIView):
                     )
                     
                 else:  # guest
-                    # Extract notes to avoid duplicate keyword argument
-                    client_data_copy = client_data.copy()
-                    notes = client_data_copy.pop('notes', '')
+                    print(f"DEBUG: Creating guest client with data: {client_data}")
                     
-                    client = Client.create_guest_client(
+                    # Check if a guest client with this email already exists
+                    existing_guest = Client.objects.filter(
                         organization=organization,
-                        emergency_contact=request.data.get('emergency_contact', ''),
-                        marketing_consent=request.data.get('marketing_consent', False),
-                        notes=notes,
-                        **client_data_copy
-                    )
+                        email=client_data['email'],
+                        client_type='guest'
+                    ).first()
+                    
+                    if existing_guest:
+                        print(f"DEBUG: Found existing guest client: {existing_guest.full_name}")
+                        # Update the existing guest client's token expiration for this new booking
+                        existing_guest.generate_guest_token()
+                        existing_guest.save()
+                        client = existing_guest
+                    else:
+                        print(f"DEBUG: Creating new guest client")
+                        # Extract notes to avoid duplicate keyword argument
+                        client_data_copy = client_data.copy()
+                        notes = client_data_copy.pop('notes', '')
+                        
+                        print(f"DEBUG: Client data after removing notes: {client_data_copy}")
+                        print(f"DEBUG: Emergency contact: {request.data.get('emergency_contact', '')}")
+                        print(f"DEBUG: Marketing consent: {request.data.get('marketing_consent', False)}")
+                        
+                        try:
+                            client = Client.create_guest_client(
+                                organization=organization,
+                                emergency_contact=request.data.get('emergency_contact', ''),
+                                marketing_consent=request.data.get('marketing_consent', False),
+                                notes=notes,
+                                **client_data_copy
+                            )
+                            print(f"DEBUG: Successfully created guest client: {client.full_name}")
+                        except Exception as e:
+                            print(f"DEBUG: Error creating guest client: {str(e)}")
+                            import traceback
+                            print(f"DEBUG: Traceback: {traceback.format_exc()}")
+                            raise
                 
                 # Crear usuario sistema para la cita (owner de la organización)
+                print(f"DEBUG: Looking for system user (owner) for organization")
                 system_user = User.objects.filter(
                     organization=organization,
                     role='owner'
                 ).first()
                 
                 if not system_user:
+                    print(f"DEBUG: No owner user found for organization")
                     return Response(
                         {'error': 'No se pudo procesar la reserva'},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR
                     )
                 
+                print(f"DEBUG: Found system user: {system_user.username}")
+                
                 # Crear la cita
-                appointment = Appointment.objects.create(
+                print(f"DEBUG: Creating appointment with:")
+                print(f"  - Start datetime: {start_datetime}")
+                print(f"  - Service duration: {service.total_duration_minutes} minutes")
+                print(f"  - Service price: {service.price}")
+                
+                appointment = Appointment(
                     organization=organization,
                     professional=professional,
                     service=service,
@@ -410,6 +515,23 @@ class PublicBookingView(APIView):
                     notes=client_data.get('notes', ''),
                     created_by=system_user
                 )
+                
+                # Save the appointment with validation
+                print(f"DEBUG: Saving appointment...")
+                try:
+                    appointment.save()
+                    print(f"DEBUG: Successfully created appointment: {appointment.id}")
+                except ValidationError as ve:
+                    print(f"DEBUG: Validation error saving appointment: {str(ve)}")
+                    return Response(
+                        {'error': f'Error de validación en la cita: {str(ve)}'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                except Exception as e:
+                    print(f"DEBUG: Unexpected error saving appointment: {str(e)}")
+                    import traceback
+                    print(f"DEBUG: Traceback: {traceback.format_exc()}")
+                    raise
                 
                 # Preparar respuesta
                 response_data = {

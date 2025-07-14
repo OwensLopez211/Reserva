@@ -1,7 +1,7 @@
 # organizations/admin.py
 
 from django.contrib import admin
-from .models import Organization, Professional, Service, Client
+from .models import Organization, Professional, Service, Client, ClientNote, ClientFile
 
 
 @admin.register(Organization)
@@ -48,3 +48,39 @@ class ClientAdmin(admin.ModelAdmin):
     list_filter = ['organization', 'is_active', 'email_notifications']
     search_fields = ['first_name', 'last_name', 'email', 'phone']
     readonly_fields = ['created_at', 'updated_at']
+
+
+@admin.register(ClientNote)
+class ClientNoteAdmin(admin.ModelAdmin):
+    """
+    Admin para el modelo ClientNote
+    """
+    list_display = ['title', 'client', 'organization', 'category', 'is_private', 'created_by', 'created_at']
+    list_filter = ['organization', 'category', 'is_private', 'created_at']
+    search_fields = ['title', 'content', 'client__first_name', 'client__last_name']
+    readonly_fields = ['created_at', 'updated_at']
+    
+    def get_queryset(self, request):
+        """Filtrar por organización si el usuario no es superuser"""
+        qs = super().get_queryset(request)
+        if not request.user.is_superuser and hasattr(request.user, 'organization'):
+            qs = qs.filter(organization=request.user.organization)
+        return qs
+
+
+@admin.register(ClientFile)
+class ClientFileAdmin(admin.ModelAdmin):
+    """
+    Admin para el modelo ClientFile
+    """
+    list_display = ['name', 'client', 'organization', 'category', 'file_size', 'uploaded_by', 'uploaded_at']
+    list_filter = ['organization', 'category', 'file_type', 'uploaded_at']
+    search_fields = ['name', 'description', 'client__first_name', 'client__last_name']
+    readonly_fields = ['uploaded_at']
+    
+    def get_queryset(self, request):
+        """Filtrar por organización si el usuario no es superuser"""
+        qs = super().get_queryset(request)
+        if not request.user.is_superuser and hasattr(request.user, 'organization'):
+            qs = qs.filter(organization=request.user.organization)
+        return qs

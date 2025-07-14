@@ -39,6 +39,7 @@ import ServicesSetupPage from './pages/onboarding/ServicesSetupPage'
 import RoleDashboard from './components/dashboard/RoleDashboard'
 import CalendarPage from './pages/calendar/CalendarPage'
 import ClientsPage from './pages/ClientsPage'
+import ClientProfilePage from './pages/ClientProfilePage'
 import TeamPage from './pages/team/TeamPage'
 import SchedulesPage from './pages/SchedulesPage'
 import ServicesPage from './pages/ServicesPage'
@@ -413,6 +414,7 @@ function App() {
                   
                   {/* Clientes */}
                   <Route path="clients" element={<ClientsPage />} />
+                  <Route path="clients/:clientId" element={<ClientProfilePage />} />
                   <Route path="my-clients" element={<MyClientsPage />} />
                   
                   {/* Reportes */}

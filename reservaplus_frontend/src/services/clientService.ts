@@ -36,6 +36,61 @@ export interface ClientLimitsInfo {
   plan_name: string
 }
 
+export interface ClientNote {
+  id: string
+  title: string
+  content: string
+  category: 'general' | 'medical' | 'preferences' | 'important' | 'follow_up'
+  is_private: boolean
+  organization: string
+  client: string
+  created_by: string
+  created_by_name: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ClientFile {
+  id: string
+  name: string
+  file_path: string
+  file_type: string
+  file_size: number
+  description: string
+  category: 'document' | 'image' | 'medical' | 'other'
+  file_url: string
+  organization: string
+  client: string
+  uploaded_by: string
+  uploaded_by_name: string
+  uploaded_at: string
+}
+
+export interface CreateClientNoteData {
+  title: string
+  content: string
+  category: ClientNote['category']
+  is_private: boolean
+  client: string
+}
+
+export interface UpdateClientNoteData {
+  title?: string
+  content?: string
+  category?: ClientNote['category']
+  is_private?: boolean
+}
+
+export interface CreateClientFileData {
+  name: string
+  file_path: string
+  file_type: string
+  file_size: number
+  description?: string
+  category: ClientFile['category']
+  client: string
+}
+
 class ClientService {
   // Obtener todos los clientes de la organización
   async getClients(filters?: ClientFilters): Promise<Client[]> {
@@ -120,6 +175,118 @@ class ClientService {
       month: 'short',
       day: 'numeric'
     })
+  }
+
+  // ===== CLIENT NOTES API =====
+
+  // Obtener notas de un cliente
+  async getClientNotes(clientId: string): Promise<ClientNote[]> {
+    const response = await api.get(`/api/organizations/client-notes/?client=${clientId}`)
+    return response.data.results || response.data
+  }
+
+  // Crear nueva nota
+  async createClientNote(noteData: CreateClientNoteData): Promise<ClientNote> {
+    const response = await api.post('/api/organizations/client-notes/', noteData)
+    return response.data
+  }
+
+  // Actualizar nota
+  async updateClientNote(noteId: string, noteData: UpdateClientNoteData): Promise<ClientNote> {
+    const response = await api.patch(`/api/organizations/client-notes/${noteId}/`, noteData)
+    return response.data
+  }
+
+  // Eliminar nota
+  async deleteClientNote(noteId: string): Promise<void> {
+    await api.delete(`/api/organizations/client-notes/${noteId}/`)
+  }
+
+  // ===== CLIENT FILES API =====
+
+  // Obtener archivos de un cliente
+  async getClientFiles(clientId: string): Promise<ClientFile[]> {
+    const response = await api.get(`/api/organizations/client-files/?client=${clientId}`)
+    return response.data.results || response.data
+  }
+
+  // Crear nuevo archivo
+  async createClientFile(fileData: CreateClientFileData): Promise<ClientFile> {
+    const response = await api.post('/api/organizations/client-files/', fileData)
+    return response.data
+  }
+
+  // Eliminar archivo
+  async deleteClientFile(fileId: string): Promise<void> {
+    await api.delete(`/api/organizations/client-files/${fileId}/`)
+  }
+
+  // Subir archivo (con FormData)
+  async uploadClientFile(clientId: string, file: File, description?: string, category?: ClientFile['category']): Promise<ClientFile> {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('client', clientId)
+    formData.append('name', file.name)
+    formData.append('file_type', file.type)
+    formData.append('file_size', file.size.toString())
+    
+    if (description) {
+      formData.append('description', description)
+    }
+    
+    if (category) {
+      formData.append('category', category)
+    }
+
+    const response = await api.post('/api/organizations/client-files/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    return response.data
+  }
+
+  // ===== UTILITY METHODS FOR NOTES AND FILES =====
+
+  // Obtener color para categoría de nota
+  getCategoryColor(category: string): string {
+    const colorMap: Record<string, string> = {
+      'important': 'bg-red-100 text-red-800',
+      'medical': 'bg-blue-100 text-blue-800',
+      'preferences': 'bg-green-100 text-green-800',
+      'follow_up': 'bg-yellow-100 text-yellow-800',
+      'general': 'bg-gray-100 text-gray-800'
+    }
+    return colorMap[category] || 'bg-gray-100 text-gray-800'
+  }
+
+  // Obtener nombre de categoría
+  getCategoryName(category: string): string {
+    const nameMap: Record<string, string> = {
+      'important': 'Importante',
+      'medical': 'Médico',
+      'preferences': 'Preferencias',
+      'follow_up': 'Seguimiento',
+      'general': 'General'
+    }
+    return nameMap[category] || category
+  }
+
+  // Formatear tamaño de archivo
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  // Obtener icono para tipo de archivo
+  getFileIcon(fileType: string): string {
+    if (fileType.includes('image')) return '🖼️'
+    if (fileType.includes('pdf')) return '📄'
+    if (fileType.includes('doc')) return '📝'
+    return '📎'
   }
 }
 

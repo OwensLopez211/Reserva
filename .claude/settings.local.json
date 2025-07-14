@@ -11,7 +11,9 @@
       "Bash(sqlite3:*)",
       "Bash(npm run build:*)",
       "Bash(grep:*)",
-      "Bash(npm run type-check:*)"
+      "Bash(npm run type-check:*)",
+      "Bash(venv/Scripts/python.exe manage.py makemigrations:*)",
+      "Bash(cd:*)"
     ],
     "deny": []
   }

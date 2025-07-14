@@ -75,14 +75,7 @@ const Navigation: React.FC = () => {
               { name: 'Horarios', href: '/app/schedules', description: 'Configurar horarios de atención' }
             ]
           },
-          {
-            name: 'Administración',
-            icon: Settings,
-            dropdown: [
-              { name: 'Gestión de Equipo', href: '/app/team', description: 'Administrar profesionales' },
-              { name: 'Configuración General', href: '/app/settings', description: 'Ajustes del sistema' }
-            ]
-          }
+          { name: 'Equipo', href: '/app/team', icon: Users }
         ]
 
       case 'admin':
@@ -317,6 +310,14 @@ const Navigation: React.FC = () => {
                       <span>Suscripción</span>
                     </button>
                     
+                    <button
+                      onClick={() => handleUserMenuItemClick('/app/settings')}
+                      className="flex items-center space-x-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-all duration-150 mx-2 rounded-xl text-left"
+                    >
+                      <Settings className="h-4 w-4" />
+                      <span>Configuración General</span>
+                    </button>
+                    
                     <div className="border-t border-gray-100/50 mt-2 pt-2">
                       <button
                         onClick={handleLogout}
@@ -441,6 +442,14 @@ const Navigation: React.FC = () => {
               >
                 <CreditCard className="h-5 w-5" />
                 <span>Suscripción</span>
+              </button>
+              
+              <button
+                onClick={() => handleUserMenuItemClick('/app/settings')}
+                className="flex items-center space-x-3 w-full px-4 py-3 text-sm text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-xl transition-all duration-150 text-left"
+              >
+                <Settings className="h-5 w-5" />
+                <span>Configuración General</span>
               </button>
               
               <button

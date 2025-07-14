@@ -133,11 +133,29 @@ class ServicesService {
   }
 
   /**
-   * Eliminar un servicio
+   * Eliminar un servicio (verifica primero si hay citas asociadas)
    */
-  async deleteService(serviceId: string): Promise<void> {
+  async deleteService(serviceId: string): Promise<{ warning?: string; appointments_count?: number; can_delete?: boolean }> {
     try {
-      await api.delete(`/api/organizations/services/${serviceId}/`);
+      const response = await api.delete(`/api/organizations/services/${serviceId}/`);
+      return response.data || {};
+    } catch (error: any) {
+      // Si el error es por citas asociadas, devolver la información de advertencia
+      if (error.response?.status === 200 && error.response?.data?.warning) {
+        return error.response.data;
+      }
+      
+      console.error('Error eliminando servicio:', error);
+      throw new Error('Error al eliminar el servicio');
+    }
+  }
+
+  /**
+   * Forzar eliminación de un servicio (sin verificar citas)
+   */
+  async forceDeleteService(serviceId: string): Promise<void> {
+    try {
+      await api.delete(`/api/organizations/services/${serviceId}/?force=true`);
     } catch (error) {
       console.error('Error eliminando servicio:', error);
       throw new Error('Error al eliminar el servicio');

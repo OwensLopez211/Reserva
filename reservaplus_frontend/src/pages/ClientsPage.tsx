@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Search,
   Filter,
@@ -21,6 +22,7 @@ type SortField = 'name' | 'email' | 'created_at' | 'appointments_count' | 'clien
 type SortOrder = 'asc' | 'desc'
 
 const ClientsPage: React.FC = () => {
+  const navigate = useNavigate()
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -440,13 +442,23 @@ const ClientsPage: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center">
                   <div className="flex items-center justify-center space-x-2">
-                    <button className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+                    <button 
+                      onClick={() => navigate(`/app/clients/${client.id}`)}
+                      className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Ver perfil del cliente"
+                    >
                       <Eye className="h-4 w-4 text-gray-500" />
                     </button>
-                    <button className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+                    <button 
+                      className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Editar cliente"
+                    >
                       <Edit className="h-4 w-4 text-gray-500" />
                     </button>
-                    <button className="p-1 hover:bg-red-100 rounded-lg transition-colors">
+                    <button 
+                      className="p-1 hover:bg-red-100 rounded-lg transition-colors"
+                      title="Eliminar cliente"
+                    >
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </button>
                   </div>

@@ -9,6 +9,8 @@ router.register(r'organizations', views.OrganizationViewSet, basename='organizat
 router.register(r'professionals', views.ProfessionalViewSet, basename='professional')
 router.register(r'services', views.ServiceViewSet, basename='service')
 router.register(r'clients', views.ClientViewSet, basename='client')
+router.register(r'client-notes', views.ClientNoteViewSet, basename='client-note')
+router.register(r'client-files', views.ClientFileViewSet, basename='client-file')
 
 urlpatterns = [
     # Mi organización

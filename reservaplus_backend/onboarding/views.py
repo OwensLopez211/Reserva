@@ -30,7 +30,7 @@ class OnboardingCompleteView(APIView):
         try:
             logger.info(f"🔍 Received onboarding data from {request.META.get('REMOTE_ADDR', 'unknown')}")
             
-            # Usar el manager para completar el onboarding
+            # Usar el manager para completar el onboarding con progress tracking
             manager = OnboardingManager()
             result = manager.complete_onboarding(request.data)
             

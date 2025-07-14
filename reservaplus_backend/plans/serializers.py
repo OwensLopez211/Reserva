@@ -56,10 +56,15 @@ class UserRegistrationCreateSerializer(serializers.ModelSerializer):
     
     def validate_email(self, value):
         """Validar que el email no esté ya registrado"""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🔍 Validating email: {value}")
+        
         from django.contrib.auth import get_user_model
         User = get_user_model()
         
         if User.objects.filter(email=value).exists():
+            logger.warning(f"🔍 Email {value} already exists in User model")
             raise serializers.ValidationError("Este email ya está registrado")
         
         # También verificar en registros temporales activos
@@ -70,18 +75,30 @@ class UserRegistrationCreateSerializer(serializers.ModelSerializer):
         ).first()
         
         if existing_registration and existing_registration.is_valid:
+            logger.warning(f"🔍 Email {value} already has active registration")
             raise serializers.ValidationError("Ya existe un registro en proceso con este email")
         
+        logger.info(f"🔍 Email {value} validation passed")
         return value
     
     def validate_plan_id(self, value):
         """Validar que el plan existe y está activo"""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🔍 Validating plan_id: {value}")
+        
         try:
             plan = Plan.objects.get(id=value, is_active=True)
             if plan.is_coming_soon:
+                logger.warning(f"🔍 Plan {value} is coming soon")
                 raise serializers.ValidationError("Este plan no está disponible aún")
+            logger.info(f"🔍 Plan {value} validation passed: {plan.name}")
             return value
         except Plan.DoesNotExist:
+            logger.error(f"🔍 Plan {value} not found")
+            # List available plans for debugging
+            available_plans = Plan.objects.filter(is_active=True).values('id', 'name')
+            logger.info(f"🔍 Available plans: {list(available_plans)}")
             raise serializers.ValidationError("Plan no encontrado")
     
     def create(self, validated_data):

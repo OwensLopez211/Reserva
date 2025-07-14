@@ -4,7 +4,7 @@ Manager principal para orquestar el proceso de onboarding
 """
 
 import logging
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
 from django.db import transaction
 from django.utils import timezone
 
@@ -21,6 +21,8 @@ from .services import (
     SubscriptionCreationService,
     OnboardingCleanupService
 )
+from .progress_service import OnboardingProgressService
+from .logging_service import onboarding_logger, error_tracker
 from .exceptions import OnboardingError, OnboardingValidationError
 
 logger = logging.getLogger(__name__)
@@ -29,9 +31,10 @@ logger = logging.getLogger(__name__)
 class OnboardingManager:
     """
     Manager principal que orquesta todo el proceso de onboarding
+    Integrado con sistema de progreso paso a paso
     """
     
-    def __init__(self):
+    def __init__(self, user_registration: Optional[UserRegistration] = None):
         self.cleanup_data = {
             'organization': None,
             'users': [],
@@ -39,10 +42,14 @@ class OnboardingManager:
             'services': [],
             'subscription': None
         }
+        self.user_registration = user_registration
+        self.progress_service = OnboardingProgressService() if user_registration else None
+        self.session_id = None
     
     def complete_onboarding(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Completar proceso de onboarding completo con rollback automático
+        Integrado con sistema de progreso paso a paso
         """
         logger.info("🚀 Starting onboarding process")
         
@@ -50,6 +57,15 @@ class OnboardingManager:
             # 1. Validar datos completos
             validated_data = OnboardingValidator.validate_complete_data(raw_data)
             registration = validated_data['registration']
+            
+            # Initialize progress tracking if we have a registration
+            if self.progress_service and registration:
+                self.session_id = self.progress_service.start_new_session(registration)
+                onboarding_logger.log_onboarding_start(
+                    user_email=registration.email,
+                    plan_name=registration.selected_plan.name,
+                    session_id=self.session_id
+                )
             
             logger.info(f"✅ Data validation passed for {registration.email}")
             
@@ -60,11 +76,27 @@ class OnboardingManager:
                 # 3. Marcar onboarding como completado
                 self._finalize_onboarding(registration, result['owner_user'])
                 
+                # Log completion
+                if self.progress_service:
+                    onboarding_logger.log_onboarding_completed(
+                        user_email=registration.email,
+                        session_id=self.session_id
+                    )
+                
                 logger.info(f"🎉 Onboarding completed successfully for {result['organization'].name}")
                 return self._format_success_response(result)
                 
         except Exception as e:
             logger.error(f"❌ Onboarding failed: {str(e)}")
+            
+            # Log error
+            if self.user_registration:
+                error_tracker.track_error(
+                    error=e,
+                    context={'onboarding_step': 'complete_onboarding'},
+                    user_email=self.user_registration.email,
+                    session_id=self.session_id
+                )
             
             # Rollback automático
             self._rollback_onboarding()
@@ -80,7 +112,7 @@ class OnboardingManager:
     
     def _execute_onboarding_steps(self, validated_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Ejecutar los pasos del onboarding en orden
+        Ejecutar los pasos del onboarding en orden con seguimiento de progreso
         """
         registration = validated_data['registration']
         organization_data = validated_data['organization']
@@ -88,40 +120,50 @@ class OnboardingManager:
         services_data = validated_data['services']
         
         # Paso 1: Crear organización
-        logger.info("📍 Step 1: Creating organization")
+        self._log_step_start('organization_info', 'Información de la Organización', registration)
         organization = OrganizationCreationService.create_organization(organization_data)
         self.cleanup_data['organization'] = organization
+        self._log_step_completed('organization_info', 'Información de la Organización', registration)
         
         # Paso 2: Crear usuario owner
-        logger.info("📍 Step 2: Creating owner user")
+        self._log_step_start('owner_account', 'Cuenta del Propietario', registration)
         owner_user = UserCreationService.create_owner_user(registration, organization)
         self.cleanup_data['users'].append(owner_user)
+        self._log_step_completed('owner_account', 'Cuenta del Propietario', registration)
         
-        # Paso 3: Crear usuarios del equipo
-        logger.info("📍 Step 3: Creating team users")
-        team_users = UserCreationService.create_team_users(professionals_data, organization)
-        self.cleanup_data['users'].extend(team_users)
+        # Paso 3: Crear usuarios del equipo (opcional)
+        if professionals_data:
+            self._log_step_start('team_members', 'Miembros del Equipo', registration)
+            team_users = UserCreationService.create_team_users(professionals_data, organization)
+            self.cleanup_data['users'].extend(team_users)
+            self._log_step_completed('team_members', 'Miembros del Equipo', registration)
+        else:
+            team_users = []
+            self._log_step_skipped('team_members', 'No team members provided', registration)
         
         # Paso 4: Crear profesionales
-        logger.info("📍 Step 4: Creating professionals")
+        self._log_step_start('professionals', 'Profesionales', registration)
         professionals = ProfessionalCreationService.create_professionals(
             professionals_data, organization, team_users
         )
         self.cleanup_data['professionals'] = professionals
+        self._log_step_completed('professionals', 'Profesionales', registration)
         
         # Paso 5: Crear servicios
-        logger.info("📍 Step 5: Creating services")
+        self._log_step_start('services', 'Servicios', registration)
         services = ServiceCreationService.create_services(
             services_data, organization, professionals
         )
         self.cleanup_data['services'] = services
+        self._log_step_completed('services', 'Servicios', registration)
         
         # Paso 6: Crear suscripción
-        logger.info("📍 Step 6: Creating subscription")
+        self._log_step_start('billing_setup', 'Configuración de Facturación', registration)
         subscription = SubscriptionCreationService.create_subscription(
             organization, registration.selected_plan, team_users, professionals, services
         )
         self.cleanup_data['subscription'] = subscription
+        self._log_step_completed('billing_setup', 'Configuración de Facturación', registration)
         
         return {
             'organization': organization,
@@ -134,9 +176,9 @@ class OnboardingManager:
     
     def _finalize_onboarding(self, registration: UserRegistration, owner_user: User):
         """
-        Finalizar el proceso de onboarding
+        Finalizar el proceso de onboarding con logging
         """
-        logger.info("📍 Step 7: Finalizing onboarding")
+        self._log_step_start('finalization', 'Finalización', registration)
         
         # Marcar organización como completada
         organization = self.cleanup_data['organization']
@@ -145,6 +187,7 @@ class OnboardingManager:
         # Marcar registro como completado
         registration.mark_completed(owner_user)
         
+        self._log_step_completed('finalization', 'Finalización', registration)
         logger.info("✅ Onboarding finalized successfully")
     
     def _rollback_onboarding(self):
@@ -274,4 +317,212 @@ class OnboardingManager:
                     'error': str(e),
                     'error_code': 'VALIDATION_ERROR'
                 }
-            } 
+            }
+    
+    # ==================== STEP-BY-STEP ONBOARDING METHODS ====================
+    
+    def process_step(self, step_key: str, step_data: Dict[str, Any], token: str) -> Dict[str, Any]:
+        """
+        Procesar un paso individual del onboarding
+        """
+        try:
+            if not self.progress_service:
+                raise OnboardingError("Progress service not initialized", error_code="PROGRESS_SERVICE_ERROR")
+            
+            # Validar token y obtener registro
+            registration = self.progress_service.validate_token(token)
+            
+            # Procesar el paso
+            result = self.progress_service.complete_step(registration, step_key, step_data)
+            
+            onboarding_logger.log_step_completed(
+                user_email=registration.email,
+                step_key=step_key,
+                step_title=result.get('step_title', step_key),
+                session_id=self.session_id
+            )
+            
+            return {
+                'success': True,
+                'step_key': step_key,
+                'progress': result.get('overall_progress', 0),
+                'next_step': result.get('next_step'),
+                'is_completed': result.get('is_onboarding_completed', False),
+                'message': f"Paso {step_key} completado exitosamente"
+            }
+            
+        except Exception as e:
+            error_tracker.track_error(
+                error=e,
+                context={'step_key': step_key, 'step_data_keys': list(step_data.keys())},
+                user_email=getattr(self.user_registration, 'email', None),
+                step_key=step_key,
+                session_id=self.session_id
+            )
+            
+            if isinstance(e, OnboardingError):
+                raise e
+            else:
+                raise OnboardingError(
+                    f"Error procesando paso {step_key}: {str(e)}",
+                    error_code="STEP_PROCESSING_ERROR"
+                )
+    
+    def skip_step(self, step_key: str, token: str, reason: str = "user_choice") -> Dict[str, Any]:
+        """
+        Saltar un paso del onboarding
+        """
+        try:
+            if not self.progress_service:
+                raise OnboardingError("Progress service not initialized", error_code="PROGRESS_SERVICE_ERROR")
+            
+            # Validar token y obtener registro
+            registration = self.progress_service.validate_token(token)
+            
+            # Saltar el paso
+            result = self.progress_service.skip_step(registration, step_key, reason)
+            
+            onboarding_logger.log_step_skipped(
+                user_email=registration.email,
+                step_key=step_key,
+                reason=reason,
+                session_id=self.session_id
+            )
+            
+            return {
+                'success': True,
+                'step_key': step_key,
+                'skipped': True,
+                'reason': reason,
+                'progress': result.get('overall_progress', 0),
+                'next_step': result.get('next_step'),
+                'message': f"Paso {step_key} omitido"
+            }
+            
+        except Exception as e:
+            error_tracker.track_error(
+                error=e,
+                context={'step_key': step_key, 'skip_reason': reason},
+                user_email=getattr(self.user_registration, 'email', None),
+                step_key=step_key,
+                session_id=self.session_id
+            )
+            
+            if isinstance(e, OnboardingError):
+                raise e
+            else:
+                raise OnboardingError(
+                    f"Error saltando paso {step_key}: {str(e)}",
+                    error_code="STEP_SKIP_ERROR"
+                )
+    
+    def get_progress(self, token: str) -> Dict[str, Any]:
+        """
+        Obtener el progreso actual del onboarding
+        """
+        try:
+            if not self.progress_service:
+                raise OnboardingError("Progress service not initialized", error_code="PROGRESS_SERVICE_ERROR")
+            
+            # Validar token y obtener registro
+            registration = self.progress_service.validate_token(token)
+            
+            # Obtener progreso
+            progress_data = self.progress_service.get_user_progress(registration)
+            
+            return {
+                'success': True,
+                'progress': progress_data
+            }
+            
+        except Exception as e:
+            error_tracker.track_error(
+                error=e,
+                context={'action': 'get_progress'},
+                user_email=getattr(self.user_registration, 'email', None),
+                session_id=self.session_id
+            )
+            
+            if isinstance(e, OnboardingError):
+                raise e
+            else:
+                raise OnboardingError(
+                    f"Error obteniendo progreso: {str(e)}",
+                    error_code="PROGRESS_FETCH_ERROR"
+                )
+    
+    def reset_progress(self, token: str) -> Dict[str, Any]:
+        """
+        Reiniciar el progreso del onboarding
+        """
+        try:
+            if not self.progress_service:
+                raise OnboardingError("Progress service not initialized", error_code="PROGRESS_SERVICE_ERROR")
+            
+            # Validar token y obtener registro
+            registration = self.progress_service.validate_token(token)
+            
+            # Reiniciar progreso
+            self.progress_service.reset_progress(registration)
+            
+            onboarding_logger.log_onboarding_start(
+                user_email=registration.email,
+                plan_name=registration.selected_plan.name,
+                session_id=self.session_id,
+                metadata={'action': 'reset'}
+            )
+            
+            return {
+                'success': True,
+                'message': 'Progreso de onboarding reiniciado',
+                'progress': 0
+            }
+            
+        except Exception as e:
+            error_tracker.track_error(
+                error=e,
+                context={'action': 'reset_progress'},
+                user_email=getattr(self.user_registration, 'email', None),
+                session_id=self.session_id
+            )
+            
+            if isinstance(e, OnboardingError):
+                raise e
+            else:
+                raise OnboardingError(
+                    f"Error reiniciando progreso: {str(e)}",
+                    error_code="PROGRESS_RESET_ERROR"
+                )
+    
+    # ==================== HELPER METHODS ====================
+    
+    def _log_step_start(self, step_key: str, step_title: str, registration: UserRegistration):
+        """Helper para logging del inicio de paso"""
+        logger.info(f"📍 Step: {step_title}")
+        if self.progress_service:
+            onboarding_logger.log_step_start(
+                user_email=registration.email,
+                step_key=step_key,
+                step_title=step_title,
+                session_id=self.session_id
+            )
+    
+    def _log_step_completed(self, step_key: str, step_title: str, registration: UserRegistration):
+        """Helper para logging de paso completado"""
+        if self.progress_service:
+            onboarding_logger.log_step_completed(
+                user_email=registration.email,
+                step_key=step_key,
+                step_title=step_title,
+                session_id=self.session_id
+            )
+    
+    def _log_step_skipped(self, step_key: str, reason: str, registration: UserRegistration):
+        """Helper para logging de paso omitido"""
+        if self.progress_service:
+            onboarding_logger.log_step_skipped(
+                user_email=registration.email,
+                step_key=step_key,
+                reason=reason,
+                session_id=self.session_id
+            ) 

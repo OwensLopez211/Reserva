@@ -1,6 +1,6 @@
 # organizations/views.py - CON INFORMACIÓN DE LÍMITES
 
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -12,12 +12,14 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from core.pagination import CustomPageNumberPagination
 from plans.models import OrganizationSubscription
 from plans.serializers import SubscriptionUsageSerializer
-from .models import Organization, Professional, Service, Client
+from .models import Organization, Professional, Service, Client, ClientNote, ClientFile
 from .serializers import (
     OrganizationSerializer, 
     ProfessionalSerializer,
     ServiceSerializer,
     ClientSerializer,
+    ClientNoteSerializer,
+    ClientFileSerializer,
     MarketplaceOrganizationSerializer,
     MarketplaceOrganizationDetailSerializer
 )
@@ -136,6 +138,36 @@ class ServiceViewSet(viewsets.ModelViewSet):
         Asignar la organización del usuario al crear un servicio
         """
         serializer.save(organization=self.request.user.organization)
+    
+    def destroy(self, request, *args, **kwargs):
+        """
+        Eliminar servicio de forma segura verificando citas asociadas
+        """
+        service = self.get_object()
+        force_delete = request.query_params.get('force', 'false').lower() == 'true'
+        
+        # Importar aquí para evitar imports circulares
+        from appointments.models import Appointment
+        
+        # Si no es eliminación forzada, verificar si hay citas asociadas
+        if not force_delete:
+            appointments_count = Appointment.objects.filter(
+                service=service,
+                organization=request.user.organization
+            ).count()
+            
+            if appointments_count > 0:
+                # Informar al usuario sobre las citas que serán afectadas
+                return Response({
+                    'warning': f'Este servicio tiene {appointments_count} cita(s) asociada(s). '
+                              'Al eliminar el servicio, las citas mantendrán su información pero '
+                              'mostrarán "Servicio eliminado" en lugar del nombre del servicio.',
+                    'appointments_count': appointments_count,
+                    'can_delete': True
+                }, status=status.HTTP_200_OK)
+        
+        # Proceder con la eliminación (normal o forzada)
+        return super().destroy(request, *args, **kwargs)
     
     @action(detail=False, methods=['get'])
     def limits_info(self, request):
@@ -332,3 +364,99 @@ class MarketplaceStatsView(APIView):
                 many=True
             ).data
         })
+
+
+class ClientNoteViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gestionar notas de clientes
+    """
+    serializer_class = ClientNoteSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['title', 'content']
+    filterset_fields = ['category', 'is_private']
+    ordering_fields = ['created_at', 'updated_at', 'title']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        """Filtrar notas por organización del usuario"""
+        user = self.request.user
+        if not user.organization:
+            return ClientNote.objects.none()
+        
+        queryset = ClientNote.objects.filter(organization=user.organization)
+        
+        # Filtrar por cliente si se proporciona
+        client_id = self.request.query_params.get('client')
+        if client_id:
+            queryset = queryset.filter(client_id=client_id)
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        """Asignar organización y usuario al crear nota"""
+        user = self.request.user
+        client_id = self.request.data.get('client')
+        
+        # Validar que el cliente pertenece a la organización
+        try:
+            client = Client.objects.get(
+                id=client_id,
+                organization=user.organization
+            )
+        except Client.DoesNotExist:
+            raise serializers.ValidationError("Cliente no encontrado o no pertenece a tu organización")
+        
+        serializer.save(
+            organization=user.organization,
+            client=client,
+            created_by=user
+        )
+
+
+class ClientFileViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gestionar archivos de clientes
+    """
+    serializer_class = ClientFileSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['name', 'description']
+    filterset_fields = ['category', 'file_type']
+    ordering_fields = ['uploaded_at', 'name', 'file_size']
+    ordering = ['-uploaded_at']
+    
+    def get_queryset(self):
+        """Filtrar archivos por organización del usuario"""
+        user = self.request.user
+        if not user.organization:
+            return ClientFile.objects.none()
+        
+        queryset = ClientFile.objects.filter(organization=user.organization)
+        
+        # Filtrar por cliente si se proporciona
+        client_id = self.request.query_params.get('client')
+        if client_id:
+            queryset = queryset.filter(client_id=client_id)
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        """Asignar organización y usuario al crear archivo"""
+        user = self.request.user
+        client_id = self.request.data.get('client')
+        
+        # Validar que el cliente pertenece a la organización
+        try:
+            client = Client.objects.get(
+                id=client_id,
+                organization=user.organization
+            )
+        except Client.DoesNotExist:
+            raise serializers.ValidationError("Cliente no encontrado o no pertenece a tu organización")
+        
+        serializer.save(
+            organization=user.organization,
+            client=client,
+            uploaded_by=user
+        )

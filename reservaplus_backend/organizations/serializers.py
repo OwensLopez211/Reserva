@@ -1,7 +1,7 @@
 # organizations/serializers.py - CON VALIDACIONES DE LÍMITES
 
 from rest_framework import serializers
-from .models import Organization, Professional, Service, Client
+from .models import Organization, Professional, Service, Client, ClientNote, ClientFile
 from core.validators import (
     validate_professional_limit,
     validate_service_limit, 
@@ -357,3 +357,90 @@ class MarketplaceOrganizationDetailSerializer(MarketplaceOrganizationSerializer)
         """Obtener servicios destacados (top 3 por precio)"""
         featured = obj.services.filter(is_active=True).order_by('-price')[:3]
         return MarketplaceServiceSerializer(featured, many=True).data
+
+
+class ClientNoteSerializer(serializers.ModelSerializer):
+    """
+    Serializer para notas de clientes
+    """
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    organization = serializers.CharField(read_only=True)
+    client = serializers.CharField(read_only=True)
+    
+    class Meta:
+        model = ClientNote
+        fields = [
+            'id', 'title', 'content', 'category', 'is_private',
+            'organization', 'client', 'created_by', 'created_by_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'organization', 'client', 'created_by', 'created_at', 'updated_at']
+    
+    def validate_title(self, value):
+        """Validar título no vacío"""
+        if not value.strip():
+            raise serializers.ValidationError("El título no puede estar vacío")
+        return value.strip()
+    
+    def validate_content(self, value):
+        """Validar contenido no vacío"""
+        if not value.strip():
+            raise serializers.ValidationError("El contenido no puede estar vacío")
+        return value.strip()
+    
+    def to_representation(self, instance):
+        """Convertir UUIDs a strings para consistencia"""
+        representation = super().to_representation(instance)
+        if instance.organization:
+            representation['organization'] = str(instance.organization.id)
+        if instance.client:
+            representation['client'] = str(instance.client.id)
+        if instance.created_by:
+            representation['created_by'] = str(instance.created_by.id)
+        return representation
+
+
+class ClientFileSerializer(serializers.ModelSerializer):
+    """
+    Serializer para archivos de clientes
+    """
+    uploaded_by_name = serializers.CharField(source='uploaded_by.get_full_name', read_only=True)
+    organization = serializers.CharField(read_only=True)
+    client = serializers.CharField(read_only=True)
+    file_url = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = ClientFile
+        fields = [
+            'id', 'name', 'file_path', 'file_type', 'file_size', 
+            'description', 'category', 'file_url',
+            'organization', 'client', 'uploaded_by', 'uploaded_by_name',
+            'uploaded_at'
+        ]
+        read_only_fields = ['id', 'organization', 'client', 'uploaded_by', 'uploaded_at']
+    
+    def validate_name(self, value):
+        """Validar nombre del archivo no vacío"""
+        if not value.strip():
+            raise serializers.ValidationError("El nombre del archivo no puede estar vacío")
+        return value.strip()
+    
+    def validate_file_size(self, value):
+        """Validar tamaño del archivo (máximo 10MB)"""
+        max_size = 10 * 1024 * 1024  # 10MB
+        if value > max_size:
+            raise serializers.ValidationError(
+                f"El archivo es demasiado grande. Máximo permitido: {max_size // (1024*1024)}MB"
+            )
+        return value
+    
+    def to_representation(self, instance):
+        """Convertir UUIDs a strings para consistencia"""
+        representation = super().to_representation(instance)
+        if instance.organization:
+            representation['organization'] = str(instance.organization.id)
+        if instance.client:
+            representation['client'] = str(instance.client.id)
+        if instance.uploaded_by:
+            representation['uploaded_by'] = str(instance.uploaded_by.id)
+        return representation

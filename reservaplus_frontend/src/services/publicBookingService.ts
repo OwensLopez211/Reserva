@@ -252,9 +252,20 @@ class PublicBookingService {
     try {
       const response = await api.post(`${this.baseUrl}/org/${orgSlug}/book/`, bookingData)
       return response.data
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al reservar cita:', error)
-      throw new Error('Error al procesar la reserva')
+      
+      // Extract detailed error message from response
+      let errorMessage = 'Error al procesar la reserva'
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      throw new Error(errorMessage)
     }
   }
 

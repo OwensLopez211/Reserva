@@ -76,6 +76,12 @@ class SignupView(APIView):
             }
         }
         """
+        # Debug: Log the incoming request data
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🔍 Signup request data: {request.data}")
+        logger.info(f"🔍 Content type: {request.content_type}")
+        
         serializer = UserRegistrationCreateSerializer(data=request.data)
         
         if serializer.is_valid():
@@ -96,6 +102,8 @@ class SignupView(APIView):
             
             return Response(response_data, status=status.HTTP_201_CREATED)
         
+        # Debug: Log validation errors
+        logger.error(f"🔍 Signup validation errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
