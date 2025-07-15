@@ -224,20 +224,20 @@ class ScheduleService {
   }
 
   /**
-   * Activar/desactivar un horario
+   * Activar/desactivar aceptación de reservas
    */
-  async toggleScheduleStatus(scheduleId: string): Promise<{
+  async toggleScheduleBookings(scheduleId: string): Promise<{
     success: boolean;
     schedule_id: string;
-    new_status: 'active' | 'inactive';
+    accepts_bookings: boolean;
     message: string;
   }> {
     try {
-      const response = await api.post(`/api/schedule/schedules/${scheduleId}/toggle-status/`);
+      const response = await api.post(`/api/schedule/schedules/${scheduleId}/toggle_bookings/`);
       return response.data;
     } catch (error) {
-      console.error('Error cambiando estado del horario:', error);
-      throw new Error('Error al cambiar el estado del horario');
+      console.error('Error cambiando estado de reservas:', error);
+      throw new Error('Error al cambiar el estado de reservas del horario');
     }
   }
 

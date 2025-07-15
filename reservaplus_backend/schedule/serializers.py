@@ -166,7 +166,7 @@ class WeeklyScheduleCreateSerializer(serializers.ModelSerializer):
 
 class ProfessionalScheduleCreateSerializer(serializers.ModelSerializer):
     """
-    Serializer para crear configuración completa de horarios
+    Serializer para crear y actualizar configuración completa de horarios
     """
     weekly_schedules = WeeklyScheduleCreateSerializer(many=True, required=False)
     exceptions = ScheduleExceptionSerializer(many=True, required=False)
@@ -211,6 +211,44 @@ class ProfessionalScheduleCreateSerializer(serializers.ModelSerializer):
             )
         
         return professional_schedule
+    
+    def update(self, instance, validated_data):
+        """
+        Actualizar configuración completa de horarios
+        """
+        weekly_schedules_data = validated_data.pop('weekly_schedules', [])
+        exceptions_data = validated_data.pop('exceptions', [])
+        
+        # Actualizar campos principales
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # Actualizar horarios semanales - eliminar existentes y crear nuevos
+        instance.weekly_schedules.all().delete()
+        for weekly_data in weekly_schedules_data:
+            breaks_data = weekly_data.pop('breaks', [])
+            weekly_schedule = WeeklySchedule.objects.create(
+                professional_schedule=instance,
+                **weekly_data
+            )
+            
+            # Crear breaks para este horario semanal
+            for break_data in breaks_data:
+                ScheduleBreak.objects.create(
+                    weekly_schedule=weekly_schedule,
+                    **break_data
+                )
+        
+        # Actualizar excepciones - eliminar existentes y crear nuevas
+        instance.exceptions.all().delete()
+        for exception_data in exceptions_data:
+            ScheduleException.objects.create(
+                professional_schedule=instance,
+                **exception_data
+            )
+        
+        return instance
 
 
 class ScheduleSummarySerializer(serializers.ModelSerializer):

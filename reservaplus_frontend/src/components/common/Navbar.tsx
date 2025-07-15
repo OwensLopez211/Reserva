@@ -1,8 +1,9 @@
 // src/components/common/Navbar.tsx - CON TRANSICIONES INTEGRADAS
 import React, { useState, useEffect, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Calendar, Shield, ArrowUp, Store, DollarSign } from 'lucide-react'
+import { Calendar, Shield, ArrowUp, Store, DollarSign, Settings, LogOut } from 'lucide-react'
 import { useTransition } from '../../contexts/TransitionContext'
+import { useAuth } from '../../contexts/AuthContext'
 
 const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -10,10 +11,12 @@ const Navbar: React.FC = () => {
   const [prevScrollPos, setPrevScrollPos] = useState(0)
   const [isVisible, setIsVisible] = useState(true)
   const [showScrollTop, setShowScrollTop] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
   
   const location = useLocation()
   const navigate = useNavigate()
   const { isTransitioning, startTransition } = useTransition()
+  const { user, isAuthenticated, logout } = useAuth()
 
   const navigation = [
     { 
@@ -99,6 +102,48 @@ const Navbar: React.FC = () => {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  // Get dashboard route based on user role
+  const getDashboardRoute = useCallback(() => {
+    if (!user) return '/dashboard'
+    
+    switch (user.role) {
+      case 'owner':
+      case 'admin':
+        return '/dashboard'
+      case 'professional':
+        return '/professional/agenda'
+      case 'reception':
+        return '/appointments'
+      case 'staff':
+        return '/appointments'
+      default:
+        return '/dashboard'
+    }
+  }, [user])
+
+  // Handle logout
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout()
+      handleNavigation('/')
+    } catch (error) {
+      console.error('Error during logout:', error)
+      handleNavigation('/')
+    }
+  }, [logout, handleNavigation])
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setShowUserMenu(false)
+    }
+    
+    if (showUserMenu) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [showUserMenu])
 
   return (
     <>
@@ -193,35 +238,100 @@ const Navbar: React.FC = () => {
 
             {/* CTA Buttons Desktop */}
             <div className="hidden lg:flex items-center space-x-3">
-              <button
-                onClick={(e) => handleNavigation('/login', e)}
-                disabled={isTransitioning}
-                className={`px-4 py-2 text-sm font-medium rounded-xl transition-all duration-300 ${
-                  isScrolled 
-                    ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100' 
-                    : 'text-gray-200 hover:text-white hover:bg-white/10'
-                } ${
-                  isTransitioning ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                Iniciar Sesión
-              </button>
-              <button
-                onClick={(e) => handleNavigation('/onboarding/plan', e)}
-                disabled={isTransitioning}
-                className={`relative group bg-gradient-to-r from-emerald-500 to-cyan-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:from-emerald-600 hover:to-cyan-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 overflow-hidden ${
-                  isTransitioning ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                {/* Button shine effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
-                <span className="relative flex items-center">
-                  {isTransitioning ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                  ) : null}
-                  Empezar Gratis
-                </span>
-              </button>
+              {isAuthenticated ? (
+                /* User Menu for authenticated users */
+                <div className="relative">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowUserMenu(!showUserMenu)
+                    }}
+                    disabled={isTransitioning}
+                    className={`flex items-center space-x-3 px-4 py-2 rounded-xl transition-all duration-300 ${
+                      isScrolled 
+                        ? 'text-gray-700 hover:bg-gray-100' 
+                        : 'text-gray-200 hover:bg-white/10'
+                    } ${
+                      isTransitioning ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-sm font-medium">
+                          {user?.first_name?.charAt(0) || user?.username?.charAt(0) || 'U'}
+                        </span>
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-medium">{user?.first_name || user?.username}</p>
+                        <p className="text-xs opacity-75 capitalize">{user?.role}</p>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* User dropdown menu */}
+                  {showUserMenu && (
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200/50 py-2 z-50">
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <p className="text-sm font-medium text-gray-900">{user?.full_name || `${user?.first_name} ${user?.last_name}`}</p>
+                        <p className="text-xs text-gray-500">{user?.email}</p>
+                        <p className="text-xs text-emerald-600 capitalize mt-1">{user?.role} - {user?.organization_name}</p>
+                      </div>
+                      
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false)
+                          handleNavigation(getDashboardRoute())
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                      >
+                        <Settings className="h-4 w-4" />
+                        <span>Ir al Panel</span>
+                      </button>
+                      
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        <span>Cerrar Sesión</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Login/Register buttons for non-authenticated users */
+                <>
+                  <button
+                    onClick={(e) => handleNavigation('/login', e)}
+                    disabled={isTransitioning}
+                    className={`px-4 py-2 text-sm font-medium rounded-xl transition-all duration-300 ${
+                      isScrolled 
+                        ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100' 
+                        : 'text-gray-200 hover:text-white hover:bg-white/10'
+                    } ${
+                      isTransitioning ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    Iniciar Sesión
+                  </button>
+                  <button
+                    onClick={(e) => handleNavigation('/onboarding/plan', e)}
+                    disabled={isTransitioning}
+                    className={`relative group bg-gradient-to-r from-emerald-500 to-cyan-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:from-emerald-600 hover:to-cyan-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 overflow-hidden ${
+                      isTransitioning ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {/* Button shine effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                    <span className="relative flex items-center">
+                      {isTransitioning ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      ) : null}
+                      Empezar Gratis
+                    </span>
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Mobile menu button */}
@@ -303,27 +413,77 @@ const Navbar: React.FC = () => {
               
               {/* Mobile CTA Section */}
               <div className="pt-6 border-t border-gray-200/50 space-y-3">
-                <button
-                  onClick={(e) => handleNavigation('/login', e)}
-                  disabled={isTransitioning}
-                  className={`block w-full px-4 py-3 text-center text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all duration-300 ${
-                    isTransitioning ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                >
-                  Iniciar Sesión
-                </button>
-                <button
-                  onClick={(e) => handleNavigation('/onboarding/plan', e)}
-                  disabled={isTransitioning}
-                  className={`flex items-center justify-center w-full bg-gradient-to-r from-emerald-500 to-cyan-500 text-white px-4 py-3 rounded-xl text-base font-semibold hover:from-emerald-600 hover:to-cyan-600 transition-all duration-300 text-center shadow-lg transform hover:scale-105 ${
-                    isTransitioning ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                >
-                  {isTransitioning ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                  ) : null}
-                  Empezar Gratis
-                </button>
+                {isAuthenticated ? (
+                  /* User info and actions for authenticated users */
+                  <>
+                    <div className="px-4 py-3 bg-gradient-to-r from-emerald-50 to-cyan-50 rounded-xl">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-sm font-medium">
+                            {user?.first_name?.charAt(0) || user?.username?.charAt(0) || 'U'}
+                          </span>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">{user?.first_name || user?.username}</p>
+                          <p className="text-xs text-gray-600">{user?.email}</p>
+                          <p className="text-xs text-emerald-600 capitalize">{user?.role}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        setIsMenuOpen(false)
+                        handleNavigation(getDashboardRoute())
+                      }}
+                      disabled={isTransitioning}
+                      className={`flex items-center justify-center w-full bg-gradient-to-r from-emerald-500 to-cyan-500 text-white px-4 py-3 rounded-xl text-base font-semibold hover:from-emerald-600 hover:to-cyan-600 transition-all duration-300 text-center shadow-lg transform hover:scale-105 ${
+                        isTransitioning ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Ir al Panel
+                    </button>
+                    
+                    <button
+                      onClick={handleLogout}
+                      disabled={isTransitioning}
+                      className={`block w-full px-4 py-3 text-center text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition-all duration-300 ${
+                        isTransitioning ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-center">
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Cerrar Sesión
+                      </div>
+                    </button>
+                  </>
+                ) : (
+                  /* Login/Register buttons for non-authenticated users */
+                  <>
+                    <button
+                      onClick={(e) => handleNavigation('/login', e)}
+                      disabled={isTransitioning}
+                      className={`block w-full px-4 py-3 text-center text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all duration-300 ${
+                        isTransitioning ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      Iniciar Sesión
+                    </button>
+                    <button
+                      onClick={(e) => handleNavigation('/onboarding/plan', e)}
+                      disabled={isTransitioning}
+                      className={`flex items-center justify-center w-full bg-gradient-to-r from-emerald-500 to-cyan-500 text-white px-4 py-3 rounded-xl text-base font-semibold hover:from-emerald-600 hover:to-cyan-600 transition-all duration-300 text-center shadow-lg transform hover:scale-105 ${
+                        isTransitioning ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      {isTransitioning ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      ) : null}
+                      Empezar Gratis
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>

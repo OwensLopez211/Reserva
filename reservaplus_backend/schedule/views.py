@@ -44,7 +44,7 @@ class ProfessionalScheduleViewSet(viewsets.ModelViewSet):
         return ProfessionalSchedule.objects.none()
     
     def get_serializer_class(self):
-        if self.action == 'create':
+        if self.action in ['create', 'update', 'partial_update']:
             return ProfessionalScheduleCreateSerializer
         elif self.action == 'list':
             return ScheduleSummarySerializer

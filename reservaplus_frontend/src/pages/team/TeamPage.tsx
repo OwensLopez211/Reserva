@@ -135,11 +135,6 @@ const TeamPage: React.FC = () => {
   }
 
 
-
-
-
-
-
   return (
     <div className="bg-gray-50 min-h-screen">
       {/* Alerta informativa */}
