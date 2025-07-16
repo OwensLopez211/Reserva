@@ -10,7 +10,7 @@ import {
   Settings,
   BarChart3,
   Plus,
-
+  User,
   Search,
   Eye,
   CheckCircle,
@@ -209,267 +209,261 @@ const OwnerDashboardPage: React.FC = () => {
       </div>
 
       <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-        {/* Métricas principales con glassmorphism */}
+        {/* Enhanced Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-          <div className="group relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-green-500/5"></div>
+          {/* Revenue Card */}
+          <div className="group relative overflow-hidden bg-white rounded-2xl p-6 border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-emerald-200">
+            <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 bg-gradient-to-br from-emerald-500/10 to-green-500/10 rounded-full"></div>
             <div className="relative">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-600 mb-2">Ingresos del mes</p>
-                  <p className="text-2xl lg:text-3xl font-bold text-gray-900">
-                    ${stats.revenue.toLocaleString('es-CL')}
-                  </p>
-                  <div className="flex items-center mt-2 text-xs text-emerald-600">
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    +{stats.monthlyGrowth}% vs mes anterior
-                  </div>
-                </div>
-                <div className="h-12 w-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl shadow-lg">
                   <DollarSign className="h-6 w-6 text-white" />
                 </div>
+                <div className="flex items-center text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                  <TrendingUp className="h-3 w-3 mr-1" />
+                  +{stats.monthlyGrowth}%
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Ingresos del mes</p>
+                <p className="text-2xl lg:text-3xl font-bold text-gray-900 mb-1">
+                  ${stats.revenue.toLocaleString('es-CL')}
+                </p>
+                <p className="text-xs text-gray-500">vs mes anterior</p>
               </div>
             </div>
           </div>
 
-          <div className="group relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-indigo-500/5"></div>
+          {/* Clients Card */}
+          <div className="group relative overflow-hidden bg-white rounded-2xl p-6 border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-blue-200">
+            <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 rounded-full"></div>
             <div className="relative">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-600 mb-2">Clientes totales</p>
-                  <p className="text-2xl lg:text-3xl font-bold text-gray-900">{stats.clients}</p>
-                  <div className="flex items-center mt-2 text-xs text-blue-600">
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    +{stats.newClients} nuevos esta semana
-                  </div>
-                </div>
-                <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
                   <Users className="h-6 w-6 text-white" />
                 </div>
+                <div className="flex items-center text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+                  <Plus className="h-3 w-3 mr-1" />
+                  +{stats.newClients}
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Clientes totales</p>
+                <p className="text-2xl lg:text-3xl font-bold text-gray-900 mb-1">{stats.clients}</p>
+                <p className="text-xs text-gray-500">nuevos esta semana</p>
               </div>
             </div>
           </div>
 
-          <div className="group relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5"></div>
+          {/* Appointments Card */}
+          <div className="group relative overflow-hidden bg-white rounded-2xl p-6 border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-purple-200">
+            <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-full"></div>
             <div className="relative">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-600 mb-2">Citas hoy</p>
-                  <p className="text-2xl lg:text-3xl font-bold text-gray-900">{stats.todayAppointments}</p>
-                  <div className="flex items-center mt-2 text-xs text-purple-600">
-                    <Clock className="h-3 w-3 mr-1" />
-                    {stats.completedToday} completadas
-                  </div>
-                </div>
-                <div className="h-12 w-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-lg">
                   <Calendar className="h-6 w-6 text-white" />
                 </div>
+                <div className="flex items-center text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  {stats.completedToday}
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Citas hoy</p>
+                <p className="text-2xl lg:text-3xl font-bold text-gray-900 mb-1">{stats.todayAppointments}</p>
+                <p className="text-xs text-gray-500">completadas</p>
               </div>
             </div>
           </div>
 
-          <div className="group relative overflow-hidden bg-white/80 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-red-500/5"></div>
+          {/* Occupancy Card */}
+          <div className="group relative overflow-hidden bg-white rounded-2xl p-6 border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-orange-200">
+            <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-full"></div>
             <div className="relative">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-600 mb-2">Ocupación</p>
-                  <p className="text-2xl lg:text-3xl font-bold text-gray-900">{stats.occupancy}%</p>
-                  <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
-                    <div 
-                      className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-500" 
-                      style={{ width: `${stats.occupancy}%` }}
-                    ></div>
-                  </div>
-                </div>
-                <div className="h-12 w-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shadow-lg">
                   <Activity className="h-6 w-6 text-white" />
+                </div>
+                <div className="flex items-center text-xs font-medium text-orange-600 bg-orange-50 px-2 py-1 rounded-full">
+                  <TrendingUp className="h-3 w-3 mr-1" />
+                  {stats.occupancy}%
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Ocupación</p>
+                <p className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">{stats.occupancy}%</p>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-500" 
+                    style={{ width: `${stats.occupancy}%` }}
+                  ></div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Grid principal */}
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-          {/* Tabla de citas - Ocupa más espacio */}
-          <div className="xl:col-span-3">
-            <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
-              <div className="p-6 border-b border-gray-100">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">Citas de Hoy</h3>
-                    <p className="text-sm text-gray-600 mt-1">Gestiona las citas programadas</p>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Buscar citas..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
-                      />
-                    </div>
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
-                    >
-                      <option value="all">Todos los estados</option>
-                      <option value="confirmed">Confirmadas</option>
-                      <option value="pending">Pendientes</option>
-                      <option value="completed">Completadas</option>
-                      <option value="cancelled">Canceladas</option>
-                    </select>
-                  </div>
-                </div>
+        {/* Appointments Table - Full Width */}
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
+          <div className="p-6 border-b border-gray-100">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Citas de Hoy</h3>
+                <p className="text-sm text-gray-600 mt-1">Gestiona las citas programadas</p>
               </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar citas..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
+                  />
+                </div>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
+                >
+                  <option value="all">Todos los estados</option>
+                  <option value="confirmed">Confirmadas</option>
+                  <option value="pending">Pendientes</option>
+                  <option value="completed">Completadas</option>
+                  <option value="cancelled">Canceladas</option>
+                </select>
+              </div>
+            </div>
+          </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50/80">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tiempo</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Servicio</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profesional</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredAppointments.map((appointment) => (
-                      <tr key={appointment.id} className="hover:bg-gray-50/50 transition-colors duration-150">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{appointment.time}</div>
-                          <div className="text-xs text-gray-500">{appointment.duration}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                              {appointment.client.name.charAt(0)}
-                            </div>
-                            <div className="ml-3">
-                              <div className="text-sm font-medium text-gray-900">{appointment.client.name}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{appointment.service}</div>
-                          <div className="text-xs text-gray-500">${appointment.price.toLocaleString('es-CL')}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="h-6 w-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center text-white text-xs font-medium">
-                              {appointment.professional.name.charAt(0)}
-                            </div>
-                            <div className="ml-2 text-sm text-gray-900">{appointment.professional.name}</div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(appointment.status)}`}>
+          {/* Desktop Table View */}
+          <div className="hidden lg:block overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50/80">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tiempo</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Servicio</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profesional</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredAppointments.map((appointment) => (
+                  <tr key={appointment.id} className="hover:bg-gray-50/50 transition-colors duration-150">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{appointment.time}</div>
+                      <div className="text-xs text-gray-500">{appointment.duration}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                          {appointment.client.name.charAt(0)}
+                        </div>
+                        <div className="ml-3">
+                          <div className="text-sm font-medium text-gray-900">{appointment.client.name}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{appointment.service}</div>
+                      <div className="text-xs text-gray-500">${appointment.price.toLocaleString('es-CL')}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-6 w-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center text-white text-xs font-medium">
+                          {appointment.professional.name.charAt(0)}
+                        </div>
+                        <div className="ml-2 text-sm text-gray-900">{appointment.professional.name}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(appointment.status)}`}>
+                        {getStatusIcon(appointment.status)}
+                        {getStatusText(appointment.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button className="text-blue-600 hover:text-blue-900 transition-colors duration-150">
+                        <Eye className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile & Tablet Card View */}
+          <div className="lg:hidden">
+            <div className="divide-y divide-gray-100">
+              {filteredAppointments.map((appointment) => (
+                <div key={appointment.id} className="p-4 hover:bg-gray-50/50 transition-colors duration-150">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-3 flex-1">
+                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-sm flex-shrink-0">
+                        <span className="text-sm font-bold text-white">
+                          {appointment.client.name.charAt(0)}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate">
+                            {appointment.client.name}
+                          </h3>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(appointment.status)} ml-2 flex-shrink-0`}>
                             {getStatusIcon(appointment.status)}
                             {getStatusText(appointment.status)}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button className="text-blue-600 hover:text-blue-900 transition-colors duration-150">
-                            <Eye className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {filteredAppointments.length === 0 && (
-                <div className="text-center py-12">
-                  <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron citas</h3>
-                  <p className="text-gray-500">Intenta ajustar los filtros de búsqueda</p>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Clock className="h-3 w-3 mr-2 text-gray-400 flex-shrink-0" />
+                            <span className="truncate">
+                              {appointment.time} - {appointment.duration}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center text-sm text-gray-600">
+                            <User className="h-3 w-3 mr-2 text-gray-400 flex-shrink-0" />
+                            <span className="truncate">{appointment.service}</span>
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center text-sm text-gray-600">
+                              <div className="h-3 w-3 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full mr-2 flex-shrink-0"></div>
+                              <span className="truncate">{appointment.professional.name}</span>
+                            </div>
+                            <div className="flex items-center text-sm font-medium text-green-600 ml-2">
+                              <DollarSign className="h-3 w-3 mr-1" />
+                              <span>${appointment.price.toLocaleString('es-CL')}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="ml-2">
+                      <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-150">
+                        <Eye className="h-4 w-4 text-gray-500" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
           </div>
 
-          {/* Panel lateral */}
-          <div className="xl:col-span-1 space-y-6">
-            {/* Estadísticas del equipo */}
-            <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl">
-              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Star className="h-5 w-5 text-yellow-500" />
-                Tu Equipo
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Profesionales</span>
-                  <span className="font-bold text-gray-900">{teamStats.totalProfessionals}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Activos hoy</span>
-                  <span className="font-bold text-emerald-600">{teamStats.activeToday}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Rating promedio</span>
-                  <div className="flex items-center gap-1">
-                    <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                    <span className="font-bold text-gray-900">{teamStats.avgRating}</span>
-                  </div>
-                </div>
-              </div>
+          {filteredAppointments.length === 0 && (
+            <div className="text-center py-12">
+              <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron citas</h3>
+              <p className="text-gray-500">Intenta ajustar los filtros de búsqueda</p>
             </div>
-
-            {/* Acciones rápidas */}
-            <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Acciones Rápidas</h3>
-              <div className="space-y-3">
-                <button className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 rounded-xl transition-all duration-200 group">
-                  <div className="flex items-center gap-3">
-                    <Calendar className="h-5 w-5 text-blue-600" />
-                    <span className="text-sm font-medium text-gray-900">Nueva Cita</span>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
-                </button>
-                
-                <button className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 rounded-xl transition-all duration-200 group">
-                  <div className="flex items-center gap-3">
-                    <Users className="h-5 w-5 text-emerald-600" />
-                    <span className="text-sm font-medium text-gray-900">Agregar Cliente</span>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-emerald-600 transition-colors" />
-                </button>
-                
-                <button className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 rounded-xl transition-all duration-200 group">
-                  <div className="flex items-center gap-3">
-                    <BarChart3 className="h-5 w-5 text-purple-600" />
-                    <span className="text-sm font-medium text-gray-900">Ver Reportes</span>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-purple-600 transition-colors" />
-                </button>
-                
-                <button className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 rounded-xl transition-all duration-200 group">
-                  <div className="flex items-center gap-3">
-                    <Settings className="h-5 w-5 text-orange-600" />
-                    <span className="text-sm font-medium text-gray-900">Configurar</span>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-orange-600 transition-colors" />
-                </button>
-              </div>
-            </div>
-
-            {/* Tip del día */}
-            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 text-white shadow-xl">
-              <h3 className="text-lg font-bold mb-2">💡 Tip del día</h3>
-              <p className="text-indigo-100 text-sm">
-                Revisa las citas pendientes y confirma con los clientes para reducir las cancelaciones de último minuto.
-              </p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

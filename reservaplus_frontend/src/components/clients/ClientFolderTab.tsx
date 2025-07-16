@@ -260,7 +260,7 @@ const ClientFolderTab: React.FC<ClientFolderTabProps> = ({ clientId, clientName 
       </div>
 
       {/* Recent Notes */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Notas Recientes</h3>
         <div className="space-y-3">
           {notes.slice(0, 3).map(note => (
@@ -281,7 +281,7 @@ const ClientFolderTab: React.FC<ClientFolderTabProps> = ({ clientId, clientName 
       </div>
 
       {/* Recent Files */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Archivos Recientes</h3>
         <div className="space-y-3">
           {files.slice(0, 3).map(file => (

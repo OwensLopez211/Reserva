@@ -5,17 +5,12 @@ import {
   Filter,
   Plus,
   Users,
-  Mail,
-  Phone,
-  Calendar,
-  Edit,
-  Trash2,
-  Eye,
   ChevronDown,
   RefreshCw,
   UserCheck
 } from 'lucide-react'
 import clientService, { Client, ClientFilters, ClientLimitsInfo } from '../services/clientService'
+import ClientTable from '../components/clients/ClientTable'
 
 type ViewMode = 'grid' | 'table' | 'list'
 type SortField = 'name' | 'email' | 'created_at' | 'appointments_count' | 'client_type'
@@ -38,6 +33,9 @@ const ClientsPage: React.FC = () => {
   // Sorting
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
+
+  // Dropdown state for table actions
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
 
   // Load clients
   const loadClients = async () => {
@@ -128,6 +126,22 @@ const ClientsPage: React.FC = () => {
       setSortField(field)
       setSortOrder('asc')
     }
+  }
+
+  // Client action handlers
+  const handleEditClient = (client: Client) => {
+    // TODO: Implement edit client modal
+    console.log('Edit client:', client)
+  }
+
+  const handleDeleteClient = (clientId: string) => {
+    // TODO: Implement delete confirmation
+    console.log('Delete client:', clientId)
+  }
+
+  const handleToggleClientStatus = (clientId: string) => {
+    // TODO: Implement toggle client status
+    console.log('Toggle client status:', clientId)
   }
 
   // Client type stats
@@ -309,179 +323,6 @@ const ClientsPage: React.FC = () => {
     </div>
   )
 
-  // Table view component
-  const TableView = () => (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th 
-                onClick={() => handleSort('name')}
-                className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Cliente</span>
-                  <ChevronDown className={`h-3 w-3 transition-transform ${
-                    sortField === 'name' && sortOrder === 'desc' ? 'rotate-180' : ''
-                  }`} />
-                </div>
-              </th>
-              <th 
-                onClick={() => handleSort('client_type')}
-                className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Tipo</span>
-                  <ChevronDown className={`h-3 w-3 transition-transform ${
-                    sortField === 'client_type' && sortOrder === 'desc' ? 'rotate-180' : ''
-                  }`} />
-                </div>
-              </th>
-              <th 
-                onClick={() => handleSort('email')}
-                className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Contacto</span>
-                  <ChevronDown className={`h-3 w-3 transition-transform ${
-                    sortField === 'email' && sortOrder === 'desc' ? 'rotate-180' : ''
-                  }`} />
-                </div>
-              </th>
-              <th 
-                onClick={() => handleSort('appointments_count')}
-                className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Citas</span>
-                  <ChevronDown className={`h-3 w-3 transition-transform ${
-                    sortField === 'appointments_count' && sortOrder === 'desc' ? 'rotate-180' : ''
-                  }`} />
-                </div>
-              </th>
-              <th 
-                onClick={() => handleSort('created_at')}
-                className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Registro</span>
-                  <ChevronDown className={`h-3 w-3 transition-transform ${
-                    sortField === 'created_at' && sortOrder === 'desc' ? 'rotate-180' : ''
-                  }`} />
-                </div>
-              </th>
-              <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Estado
-              </th>
-              <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Acciones
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredAndSortedClients.map((client) => (
-              <tr key={client.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center space-x-3">
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                      <span className="text-sm font-medium text-white">
-                        {client.first_name.charAt(0)}{client.last_name.charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {client.full_name}
-                      </div>
-                      {client.notes && (
-                        <div className="text-sm text-gray-500 truncate max-w-xs">
-                          {client.notes}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    clientService.getClientTypeColor(client.client_type)
-                  }`}>
-                    {clientService.getClientTypeDisplay(client.client_type)}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="space-y-1">
-                    {client.email && (
-                      <div className="flex items-center space-x-2 text-sm text-gray-600">
-                        <Mail className="h-3 w-3" />
-                        <span>{client.email}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center space-x-2 text-sm text-gray-600">
-                      <Phone className="h-3 w-3" />
-                      <span>{client.phone}</span>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                    <span>{client.appointments_count}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {clientService.formatCreatedAt(client.created_at)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-center">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    client.is_active 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {client.is_active ? 'Activo' : 'Inactivo'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-center">
-                  <div className="flex items-center justify-center space-x-2">
-                    <button 
-                      onClick={() => navigate(`/app/clients/${client.id}`)}
-                      className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                      title="Ver perfil del cliente"
-                    >
-                      <Eye className="h-4 w-4 text-gray-500" />
-                    </button>
-                    <button 
-                      className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                      title="Editar cliente"
-                    >
-                      <Edit className="h-4 w-4 text-gray-500" />
-                    </button>
-                    <button 
-                      className="p-1 hover:bg-red-100 rounded-lg transition-colors"
-                      title="Eliminar cliente"
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {filteredAndSortedClients.length === 0 && !loading && (
-        <div className="text-center py-12">
-          <Users className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No hay clientes</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            {searchTerm || selectedClientType !== 'all' || selectedStatus !== 'all'
-              ? 'No se encontraron clientes con los filtros aplicados.'
-              : 'Comienza agregando tu primer cliente.'}
-          </p>
-        </div>
-      )}
-    </div>
-  )
 
   // Loading state
   if (loading && clients.length === 0) {
@@ -510,7 +351,16 @@ const ClientsPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="p-6">
-        <TableView />
+        <ClientTable 
+          clients={filteredAndSortedClients}
+          loading={loading}
+          activeDropdown={activeDropdown}
+          setActiveDropdown={setActiveDropdown}
+          onEditClient={handleEditClient}
+          onDeleteClient={handleDeleteClient}
+          onToggleStatus={handleToggleClientStatus}
+          showPagination={false} // Disable pagination for now since we're not implementing it in this basic version
+        />
       </div>
     </div>
   )

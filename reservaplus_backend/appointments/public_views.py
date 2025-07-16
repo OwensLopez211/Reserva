@@ -37,10 +37,12 @@ class PublicOrganizationDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Obtener profesionales activos
+        # Obtener profesionales activos que aceptan reservas
         professionals = Professional.objects.filter(
             organization=organization,
-            is_active=True
+            is_active=True,
+            schedule__accepts_bookings=True,
+            schedule__is_active=True
         ).order_by('name')
         
         # Obtener servicios activos
@@ -69,7 +71,11 @@ class PublicOrganizationDetailView(APIView):
                         'name': prof.name,
                         'specialty': prof.specialty
                     }
-                    for prof in service.professionals.filter(is_active=True)
+                    for prof in service.professionals.filter(
+                        is_active=True,
+                        schedule__accepts_bookings=True,
+                        schedule__is_active=True
+                    )
                 ]
             })
         

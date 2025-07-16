@@ -44,8 +44,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
     if (preSelectedProfessional) {
       setSelectedProfessional(preSelectedProfessional)
       setStep('datetime')
+    } else if (service.professionals.length === 0) {
+      // Si no hay profesionales disponibles, mantener en el paso de selección para mostrar el mensaje
+      setStep('professional')
     }
-  }, [preSelectedProfessional])
+  }, [preSelectedProfessional, service.professionals.length])
 
   // Cargar disponibilidad cuando se selecciona un profesional o cambia la semana
   useEffect(() => {
@@ -317,59 +320,48 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 </p>
               </div>
               
-              {/* Opción "Cualquier profesional" */}
-              <div className="relative group">
-                <button
-                  onClick={() => handleProfessionalSelect(null)}
-                  className="w-full p-6 bg-gradient-to-r from-emerald-50 to-cyan-50 border-2 border-emerald-200 rounded-2xl hover:border-emerald-300 hover:from-emerald-100 hover:to-cyan-100 text-left transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="h-16 w-16 bg-gradient-to-br from-emerald-400 to-cyan-500 rounded-2xl flex items-center justify-center shadow-lg">
-                      <Users className="h-8 w-8 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h4 className="font-bold text-gray-900 text-lg">Cualquier profesional</h4>
-                        <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2 py-1 rounded-full">Recomendado</span>
-                      </div>
-                      <p className="text-gray-600 mb-2">
-                        Te asignamos automáticamente el mejor profesional disponible
-                      </p>
-                      <div className="flex items-center text-sm text-emerald-700">
-                        <Star className="h-4 w-4 mr-1" />
-                        <span>Más opciones de horario</span>
-                      </div>
-                    </div>
-                    <div className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ChevronRight className="h-6 w-6" />
-                    </div>
+              {/* Check if service has available professionals */}
+              {service.professionals.length === 0 ? (
+                <div className="text-center py-16">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Users className="h-8 w-8 text-gray-400" />
                   </div>
-                </button>
-              </div>
-
-              {/* Lista de profesionales */}
-              <div className="space-y-4">
-                {service.professionals.map((professional, index) => (
-                  <div key={professional.id} className="relative group">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-2">No hay profesionales disponibles</h4>
+                  <p className="text-gray-600 mb-6">
+                    Actualmente no hay profesionales disponibles para este servicio. 
+                    Por favor, inténtalo más tarde o contacta directamente con el establecimiento.
+                  </p>
+                  <button
+                    onClick={onClose}
+                    className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 transform hover:scale-105"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Opción "Cualquier profesional" */}
+                  <div className="relative group">
                     <button
-                      onClick={() => handleProfessionalSelect(professional)}
-                      className="w-full p-6 bg-white border-2 border-gray-200 rounded-2xl hover:border-emerald-300 hover:bg-emerald-50/30 text-left transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg"
+                      onClick={() => handleProfessionalSelect(null)}
+                      className="w-full p-6 bg-gradient-to-r from-emerald-50 to-cyan-50 border-2 border-emerald-200 rounded-2xl hover:border-emerald-300 hover:from-emerald-100 hover:to-cyan-100 text-left transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg"
                     >
                       <div className="flex items-center space-x-4">
-                        <div className="relative">
-                          <div className="h-16 w-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center shadow-md">
-                            <User className="h-8 w-8 text-gray-600" />
-                          </div>
-                          <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
-                            <span className="text-white text-xs font-bold">{index + 1}</span>
-                          </div>
+                        <div className="h-16 w-16 bg-gradient-to-br from-emerald-400 to-cyan-500 rounded-2xl flex items-center justify-center shadow-lg">
+                          <Users className="h-8 w-8 text-white" />
                         </div>
                         <div className="flex-1">
-                          <h4 className="font-bold text-gray-900 text-lg mb-1">{professional.name}</h4>
-                          <p className="text-emerald-600 font-medium text-sm mb-2">{professional.specialty}</p>
-                          {professional.bio && (
-                            <p className="text-gray-600 text-sm leading-relaxed">{professional.bio}</p>
-                          )}
+                          <div className="flex items-center space-x-2 mb-1">
+                            <h4 className="font-bold text-gray-900 text-lg">Cualquier profesional</h4>
+                            <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2 py-1 rounded-full">Recomendado</span>
+                          </div>
+                          <p className="text-gray-600 mb-2">
+                            Te asignamos automáticamente el mejor profesional disponible
+                          </p>
+                          <div className="flex items-center text-sm text-emerald-700">
+                            <Star className="h-4 w-4 mr-1" />
+                            <span>Más opciones de horario</span>
+                          </div>
                         </div>
                         <div className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity">
                           <ChevronRight className="h-6 w-6" />
@@ -377,8 +369,41 @@ const BookingModal: React.FC<BookingModalProps> = ({
                       </div>
                     </button>
                   </div>
-                ))}
-              </div>
+
+                  {/* Lista de profesionales */}
+                  <div className="space-y-4">
+                    {service.professionals.map((professional, index) => (
+                      <div key={professional.id} className="relative group">
+                        <button
+                          onClick={() => handleProfessionalSelect(professional)}
+                          className="w-full p-6 bg-white border-2 border-gray-200 rounded-2xl hover:border-emerald-300 hover:bg-emerald-50/30 text-left transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg"
+                        >
+                          <div className="flex items-center space-x-4">
+                            <div className="relative">
+                              <div className="h-16 w-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center shadow-md">
+                                <User className="h-8 w-8 text-gray-600" />
+                              </div>
+                              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
+                                <span className="text-white text-xs font-bold">{index + 1}</span>
+                              </div>
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-bold text-gray-900 text-lg mb-1">{professional.name}</h4>
+                              <p className="text-emerald-600 font-medium text-sm mb-2">{professional.specialty}</p>
+                              {professional.bio && (
+                                <p className="text-gray-600 text-sm leading-relaxed">{professional.bio}</p>
+                              )}
+                            </div>
+                            <div className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <ChevronRight className="h-6 w-6" />
+                            </div>
+                          </div>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -450,45 +475,82 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   </button>
                 </div>
               ) : availability ? (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
-                    {getWeekDays(getWeekStart(currentWeek)).map((day, index) => {
-                      const dateKey = day.toISOString().split('T')[0]
-                      const dayAvailability = availability.availability[dateKey]
-                      const isToday = day.toDateString() === new Date().toDateString()
-                      
-                      return (
-                        <div key={index} className="text-center">
-                          <div className={`text-sm font-bold mb-3 p-2 rounded-lg ${
-                            isToday ? 'bg-emerald-100 text-emerald-800' : 'text-gray-900'
-                          }`}>
-                            {formatDate(day)}
-                            {isToday && <div className="text-xs">Hoy</div>}
-                          </div>
+                <>
+                  {/* Check if there are any available slots in the entire week */}
+                  {Object.values(availability.availability).some(day => day.slots.length > 0) ? (
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
+                        {getWeekDays(getWeekStart(currentWeek)).map((day, index) => {
+                          const dateKey = day.toISOString().split('T')[0]
+                          const dayAvailability = availability.availability[dateKey]
+                          const isToday = day.toDateString() === new Date().toDateString()
                           
-                          <div className="space-y-2 max-h-64 overflow-y-auto">
-                            {dayAvailability && dayAvailability.slots.length > 0 ? (
-                              dayAvailability.slots.map((slot, slotIndex) => (
-                                <button
-                                  key={slotIndex}
-                                  onClick={() => handleSlotSelect(slot)}
-                                  className="w-full text-sm py-3 px-2 bg-gradient-to-r from-emerald-50 to-cyan-50 hover:from-emerald-100 hover:to-cyan-100 border-2 border-emerald-200 hover:border-emerald-300 text-emerald-700 rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-md font-medium"
-                                >
-                                  {publicBookingService.formatTime(slot.start_time)}
-                                </button>
-                              ))
-                            ) : (
-                              <div className="text-sm text-gray-400 py-8 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-                                <Clock className="h-6 w-6 mx-auto mb-2 opacity-50" />
-                                No disponible
+                          return (
+                            <div key={index} className="text-center">
+                              <div className={`text-sm font-bold mb-3 p-2 rounded-lg ${
+                                isToday ? 'bg-emerald-100 text-emerald-800' : 'text-gray-900'
+                              }`}>
+                                {formatDate(day)}
+                                {isToday && <div className="text-xs">Hoy</div>}
                               </div>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
+                              
+                              <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {dayAvailability && dayAvailability.slots.length > 0 ? (
+                                  dayAvailability.slots.map((slot, slotIndex) => (
+                                    <button
+                                      key={slotIndex}
+                                      onClick={() => handleSlotSelect(slot)}
+                                      className="w-full text-sm py-3 px-2 bg-gradient-to-r from-emerald-50 to-cyan-50 hover:from-emerald-100 hover:to-cyan-100 border-2 border-emerald-200 hover:border-emerald-300 text-emerald-700 rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-md font-medium"
+                                    >
+                                      {publicBookingService.formatTime(slot.start_time)}
+                                    </button>
+                                  ))
+                                ) : (
+                                  <div className="text-sm text-gray-400 py-8 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 text-center">
+                                    <Clock className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                                    <div className="text-xs">
+                                      {selectedProfessional 
+                                        ? 'No disponible'
+                                        : 'Sin horarios'
+                                      }
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-16">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Calendar className="h-8 w-8 text-gray-400" />
+                      </div>
+                      <h4 className="text-lg font-semibold text-gray-900 mb-2">No hay horarios disponibles</h4>
+                      <p className="text-gray-600 mb-6">
+                        {selectedProfessional 
+                          ? `${selectedProfessional.name} no tiene horarios disponibles esta semana. Intenta con otra semana o elige otro profesional.`
+                          : 'No hay horarios disponibles esta semana. Intenta con otra semana o contacta directamente con el establecimiento.'
+                        }
+                      </p>
+                      <div className="flex gap-3 justify-center">
+                        <button
+                          onClick={() => navigateWeek('prev')}
+                          className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-xl font-medium transition-all duration-200"
+                        >
+                          Semana Anterior
+                        </button>
+                        <button
+                          onClick={() => navigateWeek('next')}
+                          className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-medium transition-all duration-200"
+                        >
+                          Semana Siguiente
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : null}
             </div>
           )}

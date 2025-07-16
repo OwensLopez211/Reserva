@@ -13,7 +13,9 @@
       "Bash(grep:*)",
       "Bash(npm run type-check:*)",
       "Bash(venv/Scripts/python.exe manage.py makemigrations:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": []
   }

@@ -374,7 +374,12 @@ class MultiProfessionalAvailabilityService:
             Diccionario con professional_id como clave y lista de slots como valor
         """
         # Obtener profesionales que pueden realizar el servicio
-        professionals_query = service.professionals.filter(is_active=True)
+        # Filtrar por is_active y que tengan horarios con accepts_bookings=True
+        professionals_query = service.professionals.filter(
+            is_active=True,
+            schedule__accepts_bookings=True,
+            schedule__is_active=True
+        )
         
         if professional_ids:
             professionals_query = professionals_query.filter(id__in=professional_ids)

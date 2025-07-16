@@ -102,11 +102,11 @@ const ClientProfilePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Header */}
+      {/* Compact Header */}
       <div className="bg-white border-b border-gray-200 sticky top-16 z-10">
-        <div className="px-6 py-4">
+        <div className="px-6 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <button
                 onClick={() => navigate('/app/clients')}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -114,21 +114,21 @@ const ClientProfilePage: React.FC = () => {
                 <ArrowLeft className="h-5 w-5 text-gray-600" />
               </button>
               
-              <div className="flex items-center space-x-4">
-                <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                  <span className="text-lg font-bold text-white">
+              <div className="flex items-center space-x-3">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                  <span className="text-sm font-bold text-white">
                     {client.first_name.charAt(0)}{client.last_name.charAt(0)}
                   </span>
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">{client.full_name}</h1>
-                  <div className="flex items-center space-x-4 text-sm text-gray-500">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  <h1 className="text-xl font-bold text-gray-900">{client.full_name}</h1>
+                  <div className="flex items-center space-x-2 text-sm">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                       clientService.getClientTypeColor(client.client_type)
                     }`}>
                       {clientService.getClientTypeDisplay(client.client_type)}
                     </span>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                       client.is_active 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-red-100 text-red-800'
@@ -139,54 +139,27 @@ const ClientProfilePage: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Quick Info Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-            <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl">
-              <div className="flex items-center space-x-3">
-                <Mail className="h-5 w-5 text-blue-600" />
-                <div>
-                  <div className="text-sm font-medium text-blue-900">Email</div>
-                  <div className="text-xs text-blue-700">{client.email || 'No especificado'}</div>
-                </div>
+            {/* Compact Quick Info */}
+            <div className="hidden md:flex items-center space-x-4 text-sm">
+              <div className="flex items-center space-x-2 text-gray-600">
+                <Mail className="h-4 w-4" />
+                <span>{client.email || 'Sin email'}</span>
               </div>
-            </div>
-            
-            <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-xl">
-              <div className="flex items-center space-x-3">
-                <Phone className="h-5 w-5 text-green-600" />
-                <div>
-                  <div className="text-sm font-medium text-green-900">Teléfono</div>
-                  <div className="text-xs text-green-700">{client.phone}</div>
-                </div>
+              <div className="flex items-center space-x-2 text-gray-600">
+                <Phone className="h-4 w-4" />
+                <span>{client.phone}</span>
               </div>
-            </div>
-            
-            <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-xl">
-              <div className="flex items-center space-x-3">
-                <Calendar className="h-5 w-5 text-purple-600" />
-                <div>
-                  <div className="text-sm font-medium text-purple-900">Total Citas</div>
-                  <div className="text-xs text-purple-700">{client.appointments_count}</div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-gradient-to-r from-amber-50 to-amber-100 p-4 rounded-xl">
-              <div className="flex items-center space-x-3">
-                <Clock className="h-5 w-5 text-amber-600" />
-                <div>
-                  <div className="text-sm font-medium text-amber-900">Cliente desde</div>
-                  <div className="text-xs text-amber-700">{clientService.formatCreatedAt(client.created_at)}</div>
-                </div>
+              <div className="flex items-center space-x-2 text-gray-600">
+                <Calendar className="h-4 w-4" />
+                <span>{client.appointments_count} citas</span>
               </div>
             </div>
           </div>
 
-          {/* Tab Navigation */}
-          <div className="mt-6">
-            <nav className="flex space-x-8">
+          {/* Compact Tab Navigation */}
+          <div className="mt-3">
+            <nav className="flex space-x-6">
               {tabs.map((tab) => {
                 const Icon = tab.icon
                 const isActive = activeTab === tab.id
@@ -202,10 +175,7 @@ const ClientProfilePage: React.FC = () => {
                     }`}
                   >
                     <Icon className="h-4 w-4" />
-                    <div className="text-left">
-                      <div>{tab.label}</div>
-                      <div className="text-xs text-gray-400">{tab.description}</div>
-                    </div>
+                    <span>{tab.label}</span>
                   </button>
                 )
               })}
@@ -215,7 +185,7 @@ const ClientProfilePage: React.FC = () => {
       </div>
 
       {/* Tab Content */}
-      <div className="p-6">
+      <div className="p-4">
         {activeTab === 'personal' && (
           <PersonalInfoTab client={client} onClientUpdate={setClient} />
         )}

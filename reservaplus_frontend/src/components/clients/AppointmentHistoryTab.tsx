@@ -4,19 +4,14 @@ import {
   Clock,
   User,
   Star,
-  Filter,
-  Search,
-  ChevronDown,
   Eye,
-  Edit,
   XCircle,
   CheckCircle,
   AlertCircle,
-  RefreshCw,
-  MapPin,
   DollarSign,
   MessageSquare,
-  History
+  MoreVertical,
+  Loader2
 } from 'lucide-react'
 import appointmentService, { Appointment, CalendarFilters } from '../../services/appointmentService'
 
@@ -24,20 +19,13 @@ interface AppointmentHistoryTabProps {
   clientId: string
 }
 
-type StatusFilter = 'all' | 'completed' | 'confirmed' | 'cancelled' | 'pending' | 'no_show'
-type SortField = 'start_datetime' | 'service_name' | 'professional_name' | 'status' | 'price'
-type SortOrder = 'asc' | 'desc'
-
 const AppointmentHistoryTab: React.FC<AppointmentHistoryTabProps> = ({ clientId }) => {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [showFilters, setShowFilters] = useState(false)
-  const [sortField, setSortField] = useState<SortField>('start_datetime')
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
 
   const loadAppointments = async () => {
     try {
@@ -65,85 +53,58 @@ const AppointmentHistoryTab: React.FC<AppointmentHistoryTabProps> = ({ clientId 
     loadAppointments()
   }, [clientId])
 
-  // Filtered and sorted appointments
-  const filteredAndSortedAppointments = useMemo(() => {
-    let filtered = [...appointments]
-
-    // Apply search filter
-    if (searchTerm.trim()) {
-      const search = searchTerm.toLowerCase()
-      filtered = filtered.filter(appointment =>
-        appointment.service_name.toLowerCase().includes(search) ||
-        appointment.professional_name.toLowerCase().includes(search) ||
-        appointment.notes.toLowerCase().includes(search)
-      )
-    }
-
-    // Apply status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(appointment => appointment.status === statusFilter)
-    }
-
-    // Sort appointments
-    filtered.sort((a, b) => {
-      let aValue: any, bValue: any
-
-      switch (sortField) {
-        case 'start_datetime':
-          aValue = new Date(a.start_datetime)
-          bValue = new Date(b.start_datetime)
-          break
-        case 'service_name':
-          aValue = a.service_name.toLowerCase()
-          bValue = b.service_name.toLowerCase()
-          break
-        case 'professional_name':
-          aValue = a.professional_name.toLowerCase()
-          bValue = b.professional_name.toLowerCase()
-          break
-        case 'status':
-          aValue = a.status
-          bValue = b.status
-          break
-        case 'price':
-          aValue = parseFloat(a.price) || 0
-          bValue = parseFloat(b.price) || 0
-          break
-        default:
-          return 0
-      }
-
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1
-      return 0
+  // Sort appointments by date (most recent first)
+  const sortedAppointments = useMemo(() => {
+    return [...appointments].sort((a, b) => {
+      return new Date(b.start_datetime).getTime() - new Date(a.start_datetime).getTime()
     })
+  }, [appointments])
 
-    return filtered
-  }, [appointments, searchTerm, statusFilter, sortField, sortOrder])
+  const handleDropdownClick = (e: React.MouseEvent, appointmentId: string) => {
+    e.stopPropagation()
+    
+    if (activeDropdown === appointmentId) {
+      setActiveDropdown(null)
+      return
+    }
 
-  // Handle sort
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortField(field)
-      setSortOrder('asc')
+    const buttonRect = (e.target as HTMLElement).closest('button')?.getBoundingClientRect()
+    if (buttonRect) {
+      const top = buttonRect.bottom + window.scrollY + 4
+      const left = buttonRect.right - 192 // 192px = w-48 width
+
+      setDropdownPosition({ top, left })
+      setActiveDropdown(appointmentId)
     }
   }
 
-  // Statistics
-  const stats = useMemo(() => {
-    return {
-      total: appointments.length,
-      completed: appointments.filter(a => a.status === 'completed').length,
-      confirmed: appointments.filter(a => a.status === 'confirmed').length,
-      cancelled: appointments.filter(a => a.status === 'cancelled').length,
-      no_show: appointments.filter(a => a.status === 'no_show').length,
-      total_spent: appointments
-        .filter(a => a.status === 'completed')
-        .reduce((sum, a) => sum + (parseFloat(a.price) || 0), 0)
+  const handleAction = (action: string, appointmentId: string) => {
+    const appointment = appointments.find(a => a.id === appointmentId)
+    
+    switch (action) {
+      case 'view':
+        if (appointment) setSelectedAppointment(appointment)
+        break
+      // Add more actions as needed
     }
-  }, [appointments])
+    setActiveDropdown(null)
+  }
+
+  // Effect to close dropdown on click outside or scroll
+  React.useEffect(() => {
+    const handleScroll = () => setActiveDropdown(null)
+    const handleResize = () => setActiveDropdown(null)
+    
+    if (activeDropdown) {
+      window.addEventListener('scroll', handleScroll, true)
+      window.addEventListener('resize', handleResize)
+      
+      return () => {
+        window.removeEventListener('scroll', handleScroll, true)
+        window.removeEventListener('resize', handleResize)
+      }
+    }
+  }, [activeDropdown])
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -274,198 +235,124 @@ const AppointmentHistoryTab: React.FC<AppointmentHistoryTabProps> = ({ clientId 
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando historial de citas...</p>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
+          <span className="ml-2 text-gray-600">Cargando historial de citas...</span>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div>
       {/* Error Alert */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-4">
           {error}
         </div>
       )}
 
-      {/* Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl">
-          <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-          <div className="text-sm text-blue-700">Total Citas</div>
-        </div>
-        <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-xl">
-          <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
-          <div className="text-sm text-green-700">Completadas</div>
-        </div>
-        <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 p-4 rounded-xl">
-          <div className="text-2xl font-bold text-yellow-600">{stats.confirmed}</div>
-          <div className="text-sm text-yellow-700">Confirmadas</div>
-        </div>
-        <div className="bg-gradient-to-r from-red-50 to-red-100 p-4 rounded-xl">
-          <div className="text-2xl font-bold text-red-600">{stats.cancelled}</div>
-          <div className="text-sm text-red-700">Canceladas</div>
-        </div>
-        <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-xl">
-          <div className="text-2xl font-bold text-purple-600">${stats.total_spent.toLocaleString()}</div>
-          <div className="text-sm text-purple-700">Total Gastado</div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Buscar por servicio, profesional o notas..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-64 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">Todos los estados</option>
-              <option value="completed">Completadas</option>
-              <option value="confirmed">Confirmadas</option>
-              <option value="pending">Pendientes</option>
-              <option value="cancelled">Canceladas</option>
-              <option value="no_show">No asistió</option>
-            </select>
-          </div>
-
-          <button
-            onClick={loadAppointments}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            disabled={loading}
-          >
-            <RefreshCw className={`h-5 w-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </div>
-
-      {/* Appointments Table */}
+      {/* Clean Appointments Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        {/* Desktop Table View */}
+        <div className="hidden lg:block overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th 
-                  onClick={() => handleSort('start_datetime')}
-                  className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                >
-                  <div className="flex items-center space-x-1">
-                    <span>Fecha y Hora</span>
-                    <ChevronDown className={`h-3 w-3 transition-transform ${
-                      sortField === 'start_datetime' && sortOrder === 'desc' ? 'rotate-180' : ''
-                    }`} />
-                  </div>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Fecha y Hora
                 </th>
-                <th 
-                  onClick={() => handleSort('service_name')}
-                  className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                >
-                  <div className="flex items-center space-x-1">
-                    <span>Servicio</span>
-                    <ChevronDown className={`h-3 w-3 transition-transform ${
-                      sortField === 'service_name' && sortOrder === 'desc' ? 'rotate-180' : ''
-                    }`} />
-                  </div>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Servicio
                 </th>
-                <th 
-                  onClick={() => handleSort('professional_name')}
-                  className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                >
-                  <div className="flex items-center space-x-1">
-                    <span>Profesional</span>
-                    <ChevronDown className={`h-3 w-3 transition-transform ${
-                      sortField === 'professional_name' && sortOrder === 'desc' ? 'rotate-180' : ''
-                    }`} />
-                  </div>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Profesional
                 </th>
-                <th 
-                  onClick={() => handleSort('status')}
-                  className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                >
-                  <div className="flex items-center space-x-1">
-                    <span>Estado</span>
-                    <ChevronDown className={`h-3 w-3 transition-transform ${
-                      sortField === 'status' && sortOrder === 'desc' ? 'rotate-180' : ''
-                    }`} />
-                  </div>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Estado
                 </th>
-                <th 
-                  onClick={() => handleSort('price')}
-                  className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                >
-                  <div className="flex items-center space-x-1">
-                    <span>Precio</span>
-                    <ChevronDown className={`h-3 w-3 transition-transform ${
-                      sortField === 'price' && sortOrder === 'desc' ? 'rotate-180' : ''
-                    }`} />
-                  </div>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Precio
                 </th>
-                <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Acciones
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredAndSortedAppointments.map((appointment) => (
-                <tr key={appointment.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
+            <tbody className="bg-white divide-y divide-gray-100">
+              {sortedAppointments.map((appointment) => (
+                <tr key={appointment.id} className="hover:bg-gray-50 transition-colors duration-150">
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-semibold text-gray-900">
                       {appointmentService.formatDate(appointment.start_datetime)}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-sm text-gray-500">
                       {appointmentService.formatTime(appointment.start_datetime)} - {appointmentService.formatTime(appointment.end_datetime)}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{appointment.service_name}</div>
-                    <div className="text-xs text-gray-500">{appointment.duration_minutes} min</div>
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-semibold text-gray-900">{appointment.service_name}</div>
+                    <div className="text-sm text-gray-500">{appointment.duration_minutes} min</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{appointment.professional_name}</div>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center">
+                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-sm mr-3">
+                        <User className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="text-sm font-semibold text-gray-900">{appointment.professional_name}</div>
+                    </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center">
                       {getStatusIcon(appointment.status)}
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        appointment.status === 'completed' ? 'bg-green-100 text-green-800' :
-                        appointment.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
-                        appointment.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                        appointment.status === 'no_show' ? 'bg-gray-100 text-gray-800' :
-                        'bg-yellow-100 text-yellow-800'
+                      <span className={`ml-2 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                        appointment.status === 'completed' ? 'bg-green-100 text-green-700 border border-green-200' :
+                        appointment.status === 'confirmed' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                        appointment.status === 'cancelled' ? 'bg-red-100 text-red-700 border border-red-200' :
+                        appointment.status === 'no_show' ? 'bg-gray-100 text-gray-700 border border-gray-200' :
+                        'bg-yellow-100 text-yellow-700 border border-yellow-200'
                       }`}>
                         {appointment.status_display}
                       </span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-1">
-                      <DollarSign className="h-3 w-3 text-green-600" />
-                      <span className="text-sm font-medium text-green-600">{appointment.price}</span>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center text-sm font-medium text-green-600">
+                      <DollarSign className="h-4 w-4 mr-1" />
+                      <span>{appointment.price}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <button
-                      onClick={() => setSelectedAppointment(appointment)}
-                      className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                    >
-                      <Eye className="h-4 w-4 text-gray-500" />
-                    </button>
+                  <td className="px-6 py-4 text-right">
+                    <div className="relative">
+                      <button
+                        onClick={(e) => handleDropdownClick(e, appointment.id)}
+                        className="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-150"
+                      >
+                        <MoreVertical className="h-4 w-4 text-gray-500" />
+                      </button>
+                      
+                      {activeDropdown === appointment.id && (
+                        <div className="fixed inset-0 z-30" onClick={() => setActiveDropdown(null)}>
+                          <div 
+                            className="absolute w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-40"
+                            style={{
+                              top: `${dropdownPosition.top}px`,
+                              left: `${dropdownPosition.left}px`
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={() => handleAction('view', appointment.id)}
+                              className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-150"
+                            >
+                              <Eye className="h-4 w-4 mr-3 text-gray-500" />
+                              Ver detalles
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -473,14 +360,89 @@ const AppointmentHistoryTab: React.FC<AppointmentHistoryTabProps> = ({ clientId 
           </table>
         </div>
 
-        {filteredAndSortedAppointments.length === 0 && (
+        {/* Mobile & Tablet Card View */}
+        <div className="lg:hidden">
+          <div className="divide-y divide-gray-100">
+            {sortedAppointments.map((appointment) => (
+              <div key={appointment.id} className="p-4 hover:bg-gray-50 transition-colors duration-150">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-3 flex-1">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-sm flex-shrink-0">
+                      <Calendar className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="text-sm font-semibold text-gray-900 truncate">
+                          {appointment.service_name}
+                        </h3>
+                        <div className="flex items-center ml-2">
+                          {getStatusIcon(appointment.status)}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Clock className="h-3 w-3 mr-2 text-gray-400 flex-shrink-0" />
+                          <span className="truncate">
+                            {appointmentService.formatDate(appointment.start_datetime)} - {appointmentService.formatTime(appointment.start_datetime)}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center text-sm text-gray-600">
+                          <User className="h-3 w-3 mr-2 text-gray-400 flex-shrink-0" />
+                          <span className="truncate">{appointment.professional_name}</span>
+                        </div>
+                        
+                        <div className="flex items-center text-sm text-gray-600">
+                          <DollarSign className="h-3 w-3 mr-2 text-gray-400 flex-shrink-0" />
+                          <span className="font-medium text-green-600">{appointment.price}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="relative ml-2">
+                    <button
+                      onClick={(e) => handleDropdownClick(e, appointment.id)}
+                      className="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-150"
+                    >
+                      <MoreVertical className="h-4 w-4 text-gray-500" />
+                    </button>
+                    
+                    {activeDropdown === appointment.id && (
+                      <div className="fixed inset-0 z-30" onClick={() => setActiveDropdown(null)}>
+                        <div 
+                          className="absolute w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-40"
+                          style={{
+                            top: `${dropdownPosition.top}px`,
+                            left: `${dropdownPosition.left}px`
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={() => handleAction('view', appointment.id)}
+                            className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-150"
+                          >
+                            <Eye className="h-4 w-4 mr-3 text-gray-500" />
+                            Ver detalles
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Empty State */}
+        {sortedAppointments.length === 0 && !loading && (
           <div className="text-center py-12">
             <Calendar className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No hay citas</h3>
             <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || statusFilter !== 'all'
-                ? 'No se encontraron citas con los filtros aplicados.'
-                : 'Este cliente aún no tiene citas registradas.'}
+              Este cliente aún no tiene citas registradas.
             </p>
           </div>
         )}
