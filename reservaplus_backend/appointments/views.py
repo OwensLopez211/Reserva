@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta, time
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import Q, Count, Sum, Avg
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -14,7 +14,7 @@ from .serializers import (
     AppointmentHistorySerializer, RecurringAppointmentSerializer,
     AppointmentCalendarSerializer, AvailabilitySlotSerializer
 )
-from organizations.models import Professional, Service
+from organizations.models import Professional, Service, Client
 
 
 class AppointmentViewSet(viewsets.ModelViewSet):
@@ -292,6 +292,200 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def dashboard_stats(self, request):
+        """Estadísticas completas del dashboard"""
+        user = request.user
+        organization = user.organization
+        
+        if not organization:
+            return Response(
+                {'error': 'Usuario no tiene organización asignada'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Obtener fechas para cálculos
+        today = timezone.now().date()
+        now = timezone.now()
+        week_ago = today - timedelta(days=7)
+        month_ago = today - timedelta(days=30)
+        previous_month_start = month_ago.replace(day=1)
+        current_month_start = today.replace(day=1)
+        
+        # Base queryset para la organización
+        appointments_qs = Appointment.objects.filter(organization=organization)
+        
+        # 1. Estadísticas de hoy
+        today_appointments = appointments_qs.filter(start_datetime__date=today)
+        today_stats = today_appointments.aggregate(
+            total_appointments=Count('id'),
+            completed_appointments=Count('id', filter=Q(status='completed')),
+            confirmed_appointments=Count('id', filter=Q(status='confirmed')),
+            pending_appointments=Count('id', filter=Q(status='pending')),
+            cancelled_appointments=Count('id', filter=Q(status='cancelled')),
+            no_show_appointments=Count('id', filter=Q(status='no_show')),
+            total_revenue=Sum('price', filter=Q(status='completed')),
+            avg_duration=Avg('duration_minutes')
+        )
+        
+        # 2. Estadísticas del mes actual
+        current_month_appointments = appointments_qs.filter(
+            start_datetime__date__gte=current_month_start
+        )
+        current_month_stats = current_month_appointments.aggregate(
+            total_appointments=Count('id'),
+            completed_appointments=Count('id', filter=Q(status='completed')),
+            total_revenue=Sum('price', filter=Q(status='completed')),
+            avg_duration=Avg('duration_minutes')
+        )
+        
+        # 3. Estadísticas del mes anterior para comparación
+        previous_month_appointments = appointments_qs.filter(
+            start_datetime__date__gte=previous_month_start,
+            start_datetime__date__lt=current_month_start
+        )
+        previous_month_stats = previous_month_appointments.aggregate(
+            total_revenue=Sum('price', filter=Q(status='completed')),
+            total_appointments=Count('id')
+        )
+        
+        # 4. Calcular crecimiento mensual
+        current_revenue = current_month_stats['total_revenue'] or 0
+        previous_revenue = previous_month_stats['total_revenue'] or 0
+        revenue_growth = 0
+        if previous_revenue > 0:
+            revenue_growth = ((current_revenue - previous_revenue) / previous_revenue) * 100
+        
+        # 5. Estadísticas de clientes
+        clients_stats = Client.objects.filter(organization=organization).aggregate(
+            total_clients=Count('id'),
+            active_clients=Count('id', filter=Q(is_active=True)),
+            new_clients_this_week=Count('id', filter=Q(created_at__date__gte=week_ago))
+        )
+        
+        # 6. Estadísticas de profesionales
+        professionals_stats = Professional.objects.filter(organization=organization).aggregate(
+            total_professionals=Count('id'),
+            active_professionals=Count('id', filter=Q(is_active=True))
+        )
+        
+        # 7. Calcular ocupación (appointments completed vs total slots available)
+        # Simplificación: usar ratio de citas completadas vs total de citas del día
+        occupancy_percentage = 0
+        if today_stats['total_appointments'] and today_stats['total_appointments'] > 0:
+            occupancy_percentage = round(
+                (today_stats['completed_appointments'] / today_stats['total_appointments']) * 100, 1
+            )
+        
+        # 8. Servicios más populares (últimos 30 días)
+        popular_services = appointments_qs.filter(
+            start_datetime__date__gte=month_ago,
+            status='completed'
+        ).values(
+            'service__name'
+        ).annotate(
+            appointment_count=Count('id'),
+            total_revenue=Sum('price')
+        ).order_by('-appointment_count')[:5]
+        
+        # 9. Profesionales más activos (últimos 30 días)
+        active_professionals = appointments_qs.filter(
+            start_datetime__date__gte=month_ago,
+            status='completed'
+        ).values(
+            'professional__name'
+        ).annotate(
+            appointment_count=Count('id'),
+            total_revenue=Sum('price')
+        ).order_by('-appointment_count')[:5]
+        
+        # 10. Tendencia de citas (últimos 7 días)
+        daily_trends = []
+        for i in range(7):
+            date = today - timedelta(days=i)
+            day_appointments = appointments_qs.filter(
+                start_datetime__date=date
+            ).aggregate(
+                count=Count('id'),
+                completed=Count('id', filter=Q(status='completed')),
+                revenue=Sum('price', filter=Q(status='completed'))
+            )
+            daily_trends.append({
+                'date': date.isoformat(),
+                'appointments': day_appointments['count'] or 0,
+                'completed': day_appointments['completed'] or 0,
+                'revenue': float(day_appointments['revenue'] or 0)
+            })
+        
+        # 11. Próximas citas para hoy
+        upcoming_today = appointments_qs.filter(
+            start_datetime__date=today,
+            start_datetime__gt=now,
+            status__in=['pending', 'confirmed']
+        ).select_related('client', 'professional', 'service').order_by('start_datetime')[:10]
+        
+        upcoming_today_data = []
+        for appointment in upcoming_today:
+            upcoming_today_data.append({
+                'id': str(appointment.id),
+                'time': appointment.start_datetime.strftime('%H:%M'),
+                'client': {
+                    'name': appointment.client.full_name,
+                    'id': str(appointment.client.id)
+                },
+                'service': appointment.service.name,
+                'professional': {
+                    'name': appointment.professional.name,
+                    'id': str(appointment.professional.id)
+                },
+                'status': appointment.status,
+                'duration': f"{appointment.duration_minutes} min",
+                'price': float(appointment.price)
+            })
+        
+        # Construir respuesta
+        response_data = {
+            'organization': {
+                'id': str(organization.id),
+                'name': organization.name,
+                'industry': organization.industry_template
+            },
+            'today_stats': {
+                'total_appointments': today_stats['total_appointments'] or 0,
+                'completed_appointments': today_stats['completed_appointments'] or 0,
+                'confirmed_appointments': today_stats['confirmed_appointments'] or 0,
+                'pending_appointments': today_stats['pending_appointments'] or 0,
+                'cancelled_appointments': today_stats['cancelled_appointments'] or 0,
+                'no_show_appointments': today_stats['no_show_appointments'] or 0,
+                'total_revenue': float(today_stats['total_revenue'] or 0),
+                'avg_duration': float(today_stats['avg_duration'] or 0)
+            },
+            'month_stats': {
+                'total_appointments': current_month_stats['total_appointments'] or 0,
+                'completed_appointments': current_month_stats['completed_appointments'] or 0,
+                'total_revenue': float(current_month_stats['total_revenue'] or 0),
+                'revenue_growth': round(revenue_growth, 1),
+                'avg_duration': float(current_month_stats['avg_duration'] or 0)
+            },
+            'clients_stats': {
+                'total_clients': clients_stats['total_clients'] or 0,
+                'active_clients': clients_stats['active_clients'] or 0,
+                'new_clients_this_week': clients_stats['new_clients_this_week'] or 0
+            },
+            'professionals_stats': {
+                'total_professionals': professionals_stats['total_professionals'] or 0,
+                'active_professionals': professionals_stats['active_professionals'] or 0
+            },
+            'occupancy_percentage': occupancy_percentage,
+            'popular_services': list(popular_services),
+            'active_professionals': list(active_professionals),
+            'daily_trends': daily_trends,
+            'upcoming_appointments': upcoming_today_data,
+            'generated_at': now.isoformat()
+        }
+        
+        return Response(response_data)
 
 
 class AvailabilityView(APIView):

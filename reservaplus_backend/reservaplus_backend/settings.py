@@ -36,6 +36,7 @@ LOCAL_APPS = [
     'plans',
     'schedule',
     'onboarding',  # Nuevo módulo de onboarding
+    'payments',  # Nuevo módulo de pagos con MercadoPago
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

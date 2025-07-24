@@ -1,0 +1,26 @@
+{
+  "name": "reservaplus-lambda-functions",
+  "version": "1.0.0",
+  "description": "Lambda functions for ReservaPlus serverless backend",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "build": "npm install --production"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1491.0",
+    "uuid": "^9.0.1",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "keywords": [
+    "aws",
+    "lambda",
+    "serverless",
+    "reservaplus"
+  ],
+  "author": "ReservaPlus Team",
+  "license": "MIT"
+}

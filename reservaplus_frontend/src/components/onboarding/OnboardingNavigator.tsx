@@ -14,17 +14,23 @@ export const OnboardingNavigator: React.FC = () => {
     // Solo redirigir si estamos en la ruta base del onboarding
     if (location.pathname === '/onboarding' || location.pathname === '/onboarding/') {
       const targetUrl = navigateToCurrentStep()
-      console.log('🧭 Navegando automáticamente al paso:', currentStep, '→', targetUrl)
+      console.log('🧭 Auto-navegando al paso:', currentStep, '→', targetUrl)
       navigate(targetUrl, { replace: true })
       return
     }
 
+    console.log('🔍 OnboardingNavigator - Estado actual:', {
+      currentPath: location.pathname,
+      currentStep,
+      registrationToken: !!registrationToken
+    })
+
     // Mapeo de URLs a números de paso para validación
     const urlToStepMap: { [key: string]: number } = {
       '/onboarding/plan': 0,
-      '/onboarding/register': 1,
+      '/onboarding/services': 1,
       '/onboarding/team': 2,
-      '/onboarding/services': 3, 
+      '/onboarding/register': 3, 
       '/onboarding/organization': 4,
       '/onboarding/welcome': 5
     }
@@ -38,23 +44,30 @@ export const OnboardingNavigator: React.FC = () => {
     // (esto permite avanzar naturalmente cuando se completa un paso)
     const isNextStep = currentStepFromUrl === currentStep + 1
     
-    // Si el usuario está intentando acceder a un paso muy futuro (más de 1 paso adelante)
+    // Permitir navegación si es un paso consecutivo válido o si estamos en el paso actual
+    if (currentStepFromUrl === currentStep || isNextStep || currentStepFromUrl < currentStep) {
+      console.log('✅ Navegación permitida:', { currentStepFromUrl, currentStep, isNextStep })
+      return
+    }
+
+    // Solo bloquear si realmente es un salto muy grande (más de 1 paso adelante)
     if (currentStepFromUrl > currentStep + 1) {
       console.log('⚠️ Intento de acceso muy futuro, redirigiendo al paso actual:', currentStep)
+      console.log('🔍 Debug: currentStepFromUrl:', currentStepFromUrl, 'currentStep:', currentStep, 'location:', location.pathname)
       const expectedUrl = navigateToCurrentStep()
       navigate(expectedUrl, { replace: true })
       return
     }
 
     // Si el usuario está intentando acceder a un paso sin registro y es paso protegido
-    if (!registrationToken && currentStepFromUrl > 1) {
+    if (!registrationToken && currentStepFromUrl > 2) {
       console.log('🔒 Sin token de registro, redirigiendo al plan')
       navigate('/onboarding/plan', { replace: true })
       return
     }
 
-    // Si está en el paso correcto o uno anterior/siguiente, permitir navegación
-    console.log('✅ Navegación permitida:', { currentStepFromUrl, currentStep, isNextStep })
+    // Si llegamos aquí, permitir la navegación
+    console.log('✅ Navegación final permitida:', { currentStepFromUrl, currentStep, isNextStep })
 
   }, [currentStep, navigateToCurrentStep, navigate, location.pathname, registrationToken])
 
@@ -74,9 +87,9 @@ export const useOnboardingNavigation = () => {
     getStepInfo: (step: number) => {
       const stepInfo = {
         0: { title: 'Selección de Plan', url: '/onboarding/plan' },
-        1: { title: 'Registro', url: '/onboarding/register' },
+        1: { title: 'Servicios', url: '/onboarding/services' },
         2: { title: 'Equipo', url: '/onboarding/team' },
-        3: { title: 'Servicios', url: '/onboarding/services' },
+        3: { title: 'Registro', url: '/onboarding/register' },
         4: { title: 'Organización', url: '/onboarding/organization' },
         5: { title: 'Bienvenida', url: '/onboarding/welcome' }
       }

@@ -63,6 +63,18 @@ const TeamSetupPage: React.FC = () => {
     '#795548', '#607D8B', '#E91E63', '#00BCD4', '#CDDC39'
   ]
 
+  // Función para extraer límite de profesionales desde features
+  const extractProfessionalLimitFromFeatures = useCallback((features: string[]): number => {
+    for (const feature of features) {
+      // Buscar patrones como "1 profesional", "3 profesionales", "Hasta 5 profesionales"
+      const match = feature.match(/(\d+)\s+profesional/i)
+      if (match) {
+        return parseInt(match[1])
+      }
+    }
+    return 1 // Valor por defecto si no se encuentra
+  }, [])
+
   // Función para cargar plan desde el backend
   const loadPlanFromBackend = useCallback(async (planId: string) => {
     try {
@@ -73,6 +85,10 @@ const TeamSetupPage: React.FC = () => {
       if (selectedPlan) {
         console.log('📋 Plan cargado desde backend:', selectedPlan)
         
+        // Extraer límite de profesionales desde features
+        const professionalLimitFromFeatures = extractProfessionalLimitFromFeatures(selectedPlan.features || [])
+        console.log('👥 Límite de profesionales desde features:', professionalLimitFromFeatures)
+        
         // Ajuste específico para plan básico
         const isBasicPlan = selectedPlan.name.toLowerCase().includes('básico') || selectedPlan.name.toLowerCase().includes('basico')
         
@@ -80,7 +96,7 @@ const TeamSetupPage: React.FC = () => {
           id: selectedPlan.id,
           name: selectedPlan.name,
           max_users: isBasicPlan ? 6 : selectedPlan.max_users,
-          max_professionals: selectedPlan.max_professionals,
+          max_professionals: professionalLimitFromFeatures, // Usar el límite extraído de features
           max_receptionists: selectedPlan.max_receptionists,
           max_staff: selectedPlan.max_staff,
           max_services: selectedPlan.max_services,
@@ -98,7 +114,7 @@ const TeamSetupPage: React.FC = () => {
           id: planId,
           name: 'Plan Básico',
           max_users: 6,
-          max_professionals: 3,
+          max_professionals: 1, // Valor por defecto más conservador
           max_receptionists: 2,
           max_staff: 1,
           max_services: 10,
@@ -116,7 +132,7 @@ const TeamSetupPage: React.FC = () => {
         id: planId,
         name: 'Plan Básico',
         max_users: 6,
-        max_professionals: 3,
+        max_professionals: 1, // Valor por defecto más conservador
         max_receptionists: 2,
         max_staff: 1,
         max_services: 10,
@@ -127,55 +143,112 @@ const TeamSetupPage: React.FC = () => {
         features: []
       })
     }
-  }, [setPlanInfo])
+  }, [setPlanInfo, extractProfessionalLimitFromFeatures])
 
-  // Cargar datos del formulario de registro y crear administrador principal
+  // Función para restaurar el estado del equipo desde el contexto
+  const restoreTeamStateFromContext = useCallback(() => {
+    console.log('🔄 Restaurando estado del equipo desde contexto...')
+    
+    // Obtener datos del localStorage de team_setup (para compatibilidad)
+    const savedTeamData = localStorage.getItem('team_setup_data')
+    
+    if (savedTeamData) {
+      try {
+        const teamData = JSON.parse(savedTeamData)
+        if (teamData.teamMembers && Array.isArray(teamData.teamMembers)) {
+          console.log('📋 Restaurando desde localStorage:', teamData.teamMembers.length, 'miembros')
+          setTeamMembers(teamData.teamMembers)
+          return
+        }
+      } catch (error) {
+        console.error('Error parsing saved team data:', error)
+      }
+    }
+    
+    // Si hay profesionales en el contexto, convertirlos a teamMembers
+    if (professionals.length > 0) {
+      console.log('👥 Restaurando desde contexto de onboarding:', professionals.length, 'profesionales')
+      const restoredTeamMembers = professionals.map((prof, index) => ({
+        name: prof.name || '',
+        email: prof.email || '',
+        phone: prof.phone || '',
+        role: 'professional' as const,
+        specialty: prof.specialty || '',
+        is_professional: true,
+        color_code: prof.color_code || availableColors[index % availableColors.length],
+        accepts_walk_ins: prof.accepts_walk_ins,
+        isReadOnly: false
+      }))
+      
+      setTeamMembers(restoredTeamMembers)
+    } else {
+      console.log('📝 No hay datos previos, iniciando con equipo vacío')
+      setTeamMembers([])
+    }
+  }, [professionals, availableColors])
+
+  // Función para persistir datos del equipo
+  const saveTeamData = useCallback(() => {
+    const teamData = {
+      teamMembers: teamMembers.map(member => ({
+        name: member.name,
+        email: member.email,
+        phone: member.phone,
+        role: member.role,
+        specialty: member.specialty,
+        is_professional: member.is_professional,
+        color_code: member.color_code,
+        accepts_walk_ins: member.accepts_walk_ins
+      })),
+      timestamp: Date.now()
+    }
+    
+    localStorage.setItem('team_setup_data', JSON.stringify(teamData))
+    console.log('💾 Datos del equipo guardados en localStorage')
+  }, [teamMembers])
+
+  // Guardar automáticamente cuando cambien los teamMembers
+  useEffect(() => {
+    if (initialized && teamMembers.length > 0) {
+      saveTeamData()
+    }
+  }, [teamMembers, initialized, saveTeamData])
+
+  // Cargar datos del plan y configurar equipo inicial
   useEffect(() => {
     const initializeTeamSetup = async () => {
-    if (initialized) return
-    
-    if (!registrationToken) {
-      navigate('/onboarding/plan')
-      return
-    }
-
-    const registrationFormData = localStorage.getItem('registration_form_data')
+      if (initialized) return
+      
+      console.log('🚀 Inicializando TeamSetupPage...')
+      
+      // Solo necesitamos datos del plan seleccionado
       const selectedPlanData = localStorage.getItem('selected_plan_data')
-    
-      if (registrationFormData && selectedPlanData) {
-      try {
-          const formData = JSON.parse(registrationFormData)
+        
+      if (selectedPlanData) {
+        try {
           const planData = JSON.parse(selectedPlanData)
           
           // Obtener información completa del plan desde el backend
           await loadPlanFromBackend(planData.id || planData.name)
 
-        // Crear administrador principal (owner) - no editable
-        const adminMember: TeamMember = {
-          name: `${formData.formData.firstName} ${formData.formData.lastName}`,
-          email: formData.formData.email,
-          phone: formData.formData.phone,
-          role: 'owner',
-          specialty: 'Propietario/Director',
-          is_professional: false, // El owner NO cuenta como profesional
-          color_code: '#4CAF50',
-          accepts_walk_ins: false,
-          isReadOnly: true
-        }
-
-          setTeamMembers([adminMember])
+          // Restaurar estado del equipo desde el contexto de onboarding
+          restoreTeamStateFromContext()
+          
+          console.log('✅ Plan cargado y estado restaurado, TeamSetupPage listo para usar')
           setInitialized(true)
-      } catch (error) {
-        console.error('Error parsing registration data:', error)
-          navigate('/onboarding/register')
+          
+        } catch (error) {
+          console.error('Error parsing plan data:', error)
+          navigate('/onboarding/plan')
         }
       } else {
-        navigate('/onboarding/register')
+        console.warn('⚠️ No hay plan seleccionado, redirigiendo')
+        navigate('/onboarding/plan')
       }
     }
 
     initializeTeamSetup()
-  }, [registrationToken, navigate, initialized, loadPlanFromBackend])
+  }, [navigate, initialized, loadPlanFromBackend, restoreTeamStateFromContext])
 
   const getIndustryTerms = useCallback(() => {
     const terms: {[key: string]: {professional: string, professionals: string}} = {
@@ -282,7 +355,12 @@ const TeamSetupPage: React.FC = () => {
     }
 
     setTeamMembers(prev => [...prev, newMember])
-  }, [canAddRole, getRoleName, getDefaultSpecialty, organizationData.industry_template, teamMembers.length, availableColors])
+    
+    // Si es un profesional, también agregarlo al contexto de onboarding
+    if (role === 'professional') {
+      addProfessional()
+    }
+  }, [canAddRole, getRoleName, getDefaultSpecialty, organizationData.industry_template, teamMembers.length, availableColors, addProfessional])
 
   const updateTeamMember = useCallback((index: number, field: string, value: string | boolean) => {
     setTeamMembers(prev => {
@@ -296,6 +374,16 @@ const TeamSetupPage: React.FC = () => {
         }
         
         updated[index] = { ...updated[index], [field]: processedValue }
+        
+        // Sincronizar con el contexto de onboarding si es un profesional
+        if (updated[index].role === 'professional') {
+          const professionalIndex = updated.slice(0, index + 1).filter(m => m.role === 'professional').length - 1
+          if (professionalIndex >= 0 && professionals[professionalIndex]) {
+            const professionalUpdate: any = {}
+            professionalUpdate[field] = processedValue
+            updateProfessional(professionalIndex, professionalUpdate)
+          }
+        }
       }
       return updated
     })
@@ -308,16 +396,27 @@ const TeamSetupPage: React.FC = () => {
         return newErrors
       })
     }
-  }, [errors])
+  }, [errors, professionals, updateProfessional])
 
   const removeTeamMember = useCallback((index: number) => {
-    if (index === 0) {
+    const memberToRemove = teamMembers[index]
+    
+    // Solo prevenir eliminación si es realmente un propietario/admin (isReadOnly)
+    if (memberToRemove?.isReadOnly || memberToRemove?.role === 'owner') {
       alert('No puedes eliminar al propietario principal')
       return
     }
 
     setTeamMembers(prev => prev.filter((_, i) => i !== index))
-  }, [])
+    
+    // Si es un profesional, también eliminarlo del contexto de onboarding
+    if (memberToRemove?.role === 'professional') {
+      const professionalIndex = teamMembers.slice(0, index + 1).filter(m => m.role === 'professional').length - 1
+      if (professionalIndex >= 0) {
+        removeProfessional(professionalIndex)
+      }
+    }
+  }, [teamMembers, removeProfessional])
 
   const validateForm = useCallback((): boolean => {
     const newErrors: {[key: string]: string[]} = {}
@@ -351,11 +450,6 @@ const TeamSetupPage: React.FC = () => {
       return
     }
 
-    if (teamMembers.length === 0) {
-      alert('Debes tener al menos el administrador principal')
-      return
-    }
-
     // Verificar que haya al menos 1 profesional
     const professionalsCount = teamMembers.filter(member => member.role === 'professional').length
     if (professionalsCount === 0) {
@@ -366,28 +460,42 @@ const TeamSetupPage: React.FC = () => {
     setIsLoading(true)
     
     try {
-      // Actualizar el contexto de onboarding con los datos de los profesionales
-      // Primero, limpiar profesionales existentes (si los hay)
-      while (professionals.length > 0) {
-        removeProfessional(0)
+      // Obtener solo los profesionales (no owners, receptionist, staff)
+      const professionalsFromTeam = teamMembers.filter(member => member.role === 'professional')
+      
+      // Limpiar profesionales existentes de forma segura
+      const currentProfessionalsCount = professionals.length
+      for (let i = currentProfessionalsCount - 1; i >= 0; i--) {
+        try {
+          removeProfessional(i)
+        } catch (error) {
+          console.warn('Error removiendo profesional en índice', i, error)
+        }
       }
       
-      // Agregar solo los profesionales (no owners, receptionist, staff)
-      const professionalsFromTeam = teamMembers.filter(member => member.role === 'professional')
-      professionalsFromTeam.forEach(() => {
-        addProfessional()
-      })
+      // Agregar la cantidad correcta de profesionales vacíos
+      for (let i = 0; i < professionalsFromTeam.length; i++) {
+        try {
+          addProfessional()
+        } catch (error) {
+          console.warn('Error agregando profesional', i, error)
+        }
+      }
       
       // Actualizar cada profesional con sus datos
       professionalsFromTeam.forEach((member, index) => {
-        updateProfessional(index, {
-          name: member.name,
-          email: member.email,
-          phone: member.phone,
-          specialty: member.specialty,
-          color_code: member.color_code,
-          accepts_walk_ins: member.accepts_walk_ins
-        })
+        try {
+          updateProfessional(index, {
+            name: member.name,
+            email: member.email,
+            phone: member.phone,
+            specialty: member.specialty,
+            color_code: member.color_code,
+            accepts_walk_ins: member.accepts_walk_ins
+          })
+        } catch (error) {
+          console.warn('Error actualizando profesional', index, error)
+        }
       })
       
       // Guardar datos del equipo para el siguiente paso (mantenemos para compatibilidad)
@@ -415,8 +523,8 @@ const TeamSetupPage: React.FC = () => {
       markStepCompleted(2)
       setCurrentStep(3)
       
-      // Navegar al siguiente paso
-      navigate('/onboarding/services')
+      // Navegar al siguiente paso - CORREGIDO: debe ir a registro
+      navigate('/onboarding/register')
     } catch (error) {
       console.error('Error al guardar equipo:', error)
       alert('Error al guardar el equipo. Por favor intenta de nuevo.')
@@ -426,7 +534,7 @@ const TeamSetupPage: React.FC = () => {
   }, [validateForm, teamMembers, markStepCompleted, setCurrentStep, navigate, professionals, addProfessional, updateProfessional, removeProfessional])
 
   const handleBack = useCallback(() => {
-    navigate('/onboarding/register')
+    navigate('/onboarding/services')
   }, [navigate])
 
   const industryTerms = getIndustryTerms()
@@ -691,7 +799,10 @@ const TeamSetupPage: React.FC = () => {
               <div>
                 <h4 className="text-lg font-semibold text-gray-900">Agregar miembro del equipo</h4>
                 <p className="text-sm text-gray-600 mt-1">
-                  Máximo 3 profesionales. Los espacios restantes pueden ser recepcionistas o staff según prefieras.
+                  {planInfo && planInfo.features && (
+                    <>Según tu plan: {planInfo.features.find(f => f.includes('profesional')) || 'Plan básico'}. </>
+                  )}
+                  Los espacios restantes pueden ser recepcionistas o staff según prefieras.
                 </p>
                 {teamMembers.filter(m => m.role === 'professional').length === 0 && (
                   <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -722,12 +833,17 @@ const TeamSetupPage: React.FC = () => {
                   <div className="text-sm">
                     {canAddRole('professional') 
                       ? `Agregar ${industryTerms.professional.toLowerCase()}`
-                      : `Límite alcanzado (${planInfo?.max_professionals})`
+                      : `Límite alcanzado según tu plan`
                     }
                   </div>
                   <div className="text-xs mt-1 opacity-75">
                     Actual: {teamMembers.filter(m => m.role === 'professional').length}/{planInfo?.max_professionals}
                   </div>
+                  {planInfo?.features && (
+                    <div className="text-xs mt-1 text-blue-500 font-medium">
+                      Plan: {planInfo.features.find(f => f.includes('profesional')) || 'Plan básico'}
+                    </div>
+                  )}
                 </button>
 
                 {/* Agregar Recepcionista */}
@@ -806,12 +922,12 @@ const TeamSetupPage: React.FC = () => {
             className="flex items-center px-6 py-3 text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
-            Volver al Registro
+            Volver a Servicios
           </button>
 
           <button
             onClick={handleSubmit}
-            disabled={isLoading || teamMembers.length === 0 || teamMembers.filter(m => m.role === 'professional').length === 0}
+            disabled={isLoading || teamMembers.filter(m => m.role === 'professional').length === 0}
             className="flex items-center px-8 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             {isLoading ? (
@@ -821,7 +937,7 @@ const TeamSetupPage: React.FC = () => {
               </>
             ) : (
               <>
-                Continuar a Servicios
+                Continuar a Registro
                 <ArrowRight className="w-5 h-5 ml-2" />
               </>
             )}

@@ -8,6 +8,8 @@ import LoginSection from '../../components/auth/LoginSection'
 const LoginPage: React.FC = () => {
   const { login, isAuthenticated, loading } = useAuth()
   const location = useLocation()
+  const [loginError, setLoginError] = React.useState<string>('')
+  const [isLoggingIn, setIsLoggingIn] = React.useState(false)
 
   // Redirigir si ya está autenticado
   if (isAuthenticated) {
@@ -27,7 +29,21 @@ const LoginPage: React.FC = () => {
   }
 
   const handleLogin = async (username: string, password: string) => {
+    setIsLoggingIn(true)
+    setLoginError('')
+    
+    try {
       await login(username, password)
+    } catch (error) {
+      console.error('Login error:', error)
+      if (error instanceof Error) {
+        setLoginError(error.message)
+      } else {
+        setLoginError('Error al iniciar sesión. Intenta nuevamente.')
+      }
+    } finally {
+      setIsLoggingIn(false)
+    }
   }
 
   return (
@@ -66,10 +82,18 @@ const LoginPage: React.FC = () => {
           <LoginForm 
             onSubmit={handleLogin}
             variant="modern"
+            isSubmitting={isLoggingIn}
+            errors={loginError}
           />
 
           {/* Footer */}
           <div className="mt-8 text-center">
+            <p className="text-sm text-gray-600 mb-4">
+              ¿No tienes cuenta?{' '}
+              <a href="/onboarding/plan" className="text-emerald-600 hover:text-emerald-700 font-medium">
+                Regístrate aquí
+              </a>
+            </p>
             <p className="text-xs text-gray-500">
               Al iniciar sesión, aceptas nuestros{' '}
               <button className="text-emerald-600 hover:text-emerald-500 font-medium">

@@ -32,7 +32,12 @@ const LoginForm: React.FC<LoginFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await onSubmit(formData.username, formData.password)
+    try {
+      await onSubmit(formData.username, formData.password)
+    } catch (error) {
+      // Error handling is done in the parent component (LoginLayout/LoginPage)
+      console.error('Login form error:', error)
+    }
   }
 
   if (variant === 'minimal') {

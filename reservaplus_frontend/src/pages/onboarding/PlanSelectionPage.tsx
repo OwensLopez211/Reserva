@@ -92,11 +92,15 @@ const PlanSelectionPage: React.FC = () => {
       localStorage.setItem('selected_plan_data', JSON.stringify(selectedPlan))
       
       // Actualizar el contexto de onboarding
+      console.log('🔄 Actualizando contexto: markStepCompleted(0), setCurrentStep(1)')
       markStepCompleted(0) // Marcar paso 0 (selección de plan) como completado
-      setCurrentStep(1) // Avanzar al paso 1 (registro)
+      setCurrentStep(1) // Avanzar al paso 1 (servicios)
       
-      // Navegar al registro
-      navigate('/onboarding/register')
+      // Esperar un tick para que el contexto se actualice antes de navegar
+      setTimeout(() => {
+        console.log('🎯 Navegando a /onboarding/services')
+        navigate('/onboarding/services')
+      }, 0)
       
     } catch (error) {
       console.error('❌ Error al seleccionar plan:', error)

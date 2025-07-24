@@ -27,6 +27,13 @@ const ProfilePage: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
   const [subscriptionLoading, setSubscriptionLoading] = useState(false)
+  
+  // Estados para el sistema de pagos real
+  const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null)
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null)
+  const [mpPaymentMethods, setMpPaymentMethods] = useState<MPPaymentMethod[]>([])
+  const [recentPayments, setRecentPayments] = useState<Payment[]>([])
+  const [paymentLoading, setPaymentLoading] = useState(false)
 
   const [formData, setFormData] = useState<UserProfileUpdate>({
     first_name: '', last_name: '', phone: '',

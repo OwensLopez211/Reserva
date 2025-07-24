@@ -20,7 +20,6 @@ interface RegistrationData {
   // Datos de la organización
   organizationName: string
   industryTemplate: string
-  businessEmail: string
   businessPhone: string
   address: string
   city: string
@@ -53,7 +52,7 @@ type Plan = {
 
 const RegistrationPage: React.FC = () => {
   const navigate = useNavigate()
-  const { initializeFromToken, setCurrentStep, markStepCompleted, updateOrganizationData } = useOnboarding()
+  const { initializeFromToken, setCurrentStep, markStepCompleted, updateOrganizationData, services, professionals } = useOnboarding()
   
   const [formData, setFormData] = useState<RegistrationData>({
     firstName: '',
@@ -64,7 +63,6 @@ const RegistrationPage: React.FC = () => {
     confirmPassword: '',
     organizationName: '',
     industryTemplate: 'salon',
-    businessEmail: '',
     businessPhone: '',
     address: '',
     city: '',
@@ -97,6 +95,163 @@ const RegistrationPage: React.FC = () => {
       navigate('/onboarding/plan')
     }
   }, [navigate])
+
+  // Función para recopilar todos los datos del onboarding desde localStorage
+  const collectAllOnboardingData = async () => {
+    try {
+      // Datos del plan seleccionado
+      const selectedPlanData = localStorage.getItem('selected_plan_data')
+      const selectedPlanId = localStorage.getItem('selected_plan_id')
+      const selectedBilling = localStorage.getItem('selected_billing')
+
+      // Datos del equipo
+      const teamSetupData = localStorage.getItem('team_setup_data')
+
+      // Datos de servicios desde el contexto de onboarding
+      const onboardingProgressData = localStorage.getItem('onboarding_progress')
+
+      const collectedData = {
+        // Plan information
+        plan: selectedPlanData ? JSON.parse(selectedPlanData) : null,
+        planId: selectedPlanId,
+        billing: selectedBilling || 'monthly',
+        
+        // Organization data (from current form)
+        organization: {
+          name: formData.organizationName,
+          industry_template: formData.industryTemplate,
+          email: formData.email,
+          phone: getPhoneNumbers(formData.businessPhone),
+          address: formData.address || '',
+          city: formData.city || '',
+          country: formData.country || 'Chile'
+        },
+
+        // Admin user data
+        adminUser: {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: getPhoneNumbers(formData.phone),
+          password: formData.password
+        },
+
+        // Team members data
+        teamMembers: teamSetupData ? JSON.parse(teamSetupData).teamMembers || [] : [],
+
+        // Services data - prioritize context over localStorage
+        services: services.length > 0 ? services : 
+          (onboardingProgressData ? (JSON.parse(onboardingProgressData).services || []) : []),
+
+        // Professionals data from context (as backup)
+        professionals: professionals.length > 0 ? professionals : []
+      }
+
+      console.log('📊 Datos recopilados del onboarding:', collectedData)
+      return collectedData
+
+    } catch (error) {
+      console.error('Error recopilando datos del onboarding:', error)
+      throw new Error('Error al recopilar los datos del proceso de configuración')
+    }
+  }
+
+  // Función para crear todas las entidades en el backend
+  const createAllOnboardingEntities = async (registrationToken: string, onboardingData: any) => {
+    try {
+      console.log('🏗️ Creando todas las entidades del onboarding...')
+
+      // Preparar datos en el formato exacto que espera el backend
+      const completeOnboardingData = {
+        registration_token: registrationToken,
+        
+        organization: {
+          name: onboardingData.organization.name,
+          industry_template: onboardingData.organization.industry_template,
+          email: onboardingData.organization.email,
+          phone: onboardingData.organization.phone,
+          address: onboardingData.organization.address,
+          city: onboardingData.organization.city,
+          country: onboardingData.organization.country
+        },
+
+        // Usar profesionales del contexto como principal, teamMembers como fallback
+        professionals: (() => {
+          // Si hay profesionales en el contexto, usarlos
+          if (onboardingData.professionals && onboardingData.professionals.length > 0) {
+            return onboardingData.professionals.map((prof: any) => ({
+              name: prof.name || '',
+              email: prof.email || '',
+              phone: prof.phone || '',
+              specialty: prof.specialty || '',
+              role: prof.role || 'professional',
+              color_code: prof.color_code || '#4CAF50',
+              accepts_walk_ins: prof.accepts_walk_ins !== undefined ? prof.accepts_walk_ins : true
+            }))
+          }
+          
+          // Fallback: usar teamMembers (TODOS los miembros, no solo profesionales)
+          return onboardingData.teamMembers
+            .map((member: any) => ({
+              name: member.name || '',
+              email: member.email || '',
+              phone: member.phone || '',
+              specialty: member.specialty || '',
+              role: member.role || 'professional',
+              color_code: member.color_code || '#4CAF50',
+              accepts_walk_ins: member.accepts_walk_ins !== undefined ? member.accepts_walk_ins : true
+            }))
+        })(),
+
+        // Servicios
+        services: onboardingData.services.map((service: any) => ({
+          name: service.name || '',
+          description: service.description || '',
+          category: service.category || '',
+          duration_minutes: service.duration_minutes || 60,
+          price: service.price || 0,
+          buffer_time_before: service.buffer_time_before || 0,
+          buffer_time_after: service.buffer_time_after || 10,
+          is_active: service.is_active !== undefined ? service.is_active : true,
+          requires_preparation: service.requires_preparation !== undefined ? service.requires_preparation : false
+        }))
+      }
+
+      console.log('📤 Enviando datos completos al backend:', JSON.stringify(completeOnboardingData, null, 2))
+
+      // Enviar al backend usando el servicio de onboarding
+      const result = await OnboardingService.completeOnboarding(completeOnboardingData)
+      
+      console.log('✅ Entidades creadas exitosamente:', result)
+      return result
+
+    } catch (error) {
+      console.error('❌ Error creando entidades:', error)
+      throw error
+    }
+  }
+
+  // Función para limpiar datos del localStorage después del éxito
+  const cleanupOnboardingData = () => {
+    try {
+      const keysToClean = [
+        'selected_plan_data',
+        'selected_plan_id', 
+        'selected_billing',
+        'team_setup_data',
+        'registration_form_data',
+        'onboarding_progress'
+      ]
+
+      keysToClean.forEach(key => {
+        localStorage.removeItem(key)
+      })
+
+      console.log('🧹 Datos de onboarding limpiados del localStorage')
+    } catch (error) {
+      console.error('Error limpiando localStorage:', error)
+    }
+  }
 
   const industryOptions: IndustryOption[] = [
     {
@@ -173,11 +328,6 @@ const RegistrationPage: React.FC = () => {
       })
     }
 
-    // Auto-completar email de negocio si no está definido
-    if (field === 'email' && !formData.businessEmail) {
-      setFormData(prev => ({ ...prev, businessEmail: value as string }))
-    }
-
     // Auto-completar teléfono de negocio si no está definido
     if (field === 'phone' && !formData.businessPhone) {
       setFormData(prev => ({ ...prev, businessPhone: processedValue as string }))
@@ -215,9 +365,6 @@ const RegistrationPage: React.FC = () => {
     if (!formData.organizationName.trim()) {
       newErrors.organizationName = ['El nombre de la organización es requerido']
     }
-    if (!formData.businessEmail.trim()) {
-      newErrors.businessEmail = ['El email del negocio es requerido']
-    }
     if (!formData.businessPhone.trim()) {
       newErrors.businessPhone = ['El teléfono del negocio es requerido']
     }
@@ -247,9 +394,14 @@ const RegistrationPage: React.FC = () => {
     setIsLoading(true)
     
     try {
-      console.log('🚀 Iniciando signup con datos:', formData)
+      console.log('🚀 Iniciando proceso completo de onboarding...')
 
-      // Usar el servicio actualizado para hacer signup
+      // Recopilar TODOS los datos del onboarding desde localStorage
+      const onboardingData = await collectAllOnboardingData()
+      
+      console.log('📋 Datos completos de onboarding recopilados:', onboardingData)
+
+      // Hacer signup inicial
       const signupResponse = await OnboardingService.startSignup(
         selectedPlan.id,
         {
@@ -263,58 +415,25 @@ const RegistrationPage: React.FC = () => {
 
       console.log('✅ Signup exitoso:', signupResponse)
 
-      // Inicializar el contexto de onboarding con el token
-      const tokenValid = await initializeFromToken(signupResponse.registration_token)
+      // Ahora crear TODAS las entidades con los datos recopilados
+      await createAllOnboardingEntities(signupResponse.registration_token, onboardingData)
+
+      console.log('🎉 Proceso de onboarding completado exitosamente')
+
+      // Limpiar localStorage después del éxito
+      cleanupOnboardingData()
+
+      // Mostrar mensaje de éxito y redirigir al login
+      console.log('✅ Usuario registrado exitosamente. Redirigiendo al login...')
       
-      if (tokenValid) {
-        // Actualizar el contexto de onboarding con los datos de la organización
-        updateOrganizationData({
-          name: formData.organizationName,
-          industry_template: formData.industryTemplate,
-          email: formData.businessEmail,
-          phone: getPhoneNumbers(formData.businessPhone),
-          address: formData.address || '',
-          city: formData.city || '',
-          country: formData.country || 'Chile'
-        })
-
-        // Guardar datos adicionales del formulario para usar en pasos posteriores
-        const additionalData = {
-          formData: {
-            ...formData,
-            phone: getPhoneNumbers(formData.phone),
-            businessPhone: getPhoneNumbers(formData.businessPhone)
-          },
-          industryTemplate: formData.industryTemplate,
-          businessInfo: {
-            email: formData.businessEmail,
-            phone: getPhoneNumbers(formData.businessPhone),
-            address: formData.address,
-            city: formData.city,
-            country: formData.country
-          }
-        }
-        localStorage.setItem('registration_form_data', JSON.stringify(additionalData))
-
-        console.log('✅ Datos de organización actualizados en el contexto:', {
-          name: formData.organizationName,
-          industry_template: formData.industryTemplate,
-          email: formData.businessEmail,
-          phone: getPhoneNumbers(formData.businessPhone)
-        })
-
-        // Actualizar el contexto de onboarding
-        markStepCompleted(1) // Marcar paso 1 (registro) como completado
-        setCurrentStep(2) // Avanzar al paso 2 (team)
-
-        // Navegar al siguiente paso
-        navigate('/onboarding/team')
-      } else {
-        setErrors({ submit: ['Error al inicializar el proceso de registro'] })
-      }
+      // Opcional: Mostrar mensaje de éxito antes de redirigir
+      // alert('¡Cuenta creada exitosamente! Serás redirigido al login.')
+      
+      // Redirigir al login
+      navigate('/login')
       
     } catch (error) {
-      console.error('❌ Error en registro:', error)
+      console.error('❌ Error en proceso completo de onboarding:', error)
       
       if (error && typeof error === 'object' && 'message' in error) {
         setErrors({ submit: [(error as { message: string }).message] })
@@ -327,7 +446,7 @@ const RegistrationPage: React.FC = () => {
   }
 
   const handleBack = () => {
-    navigate('/onboarding/plan')
+    navigate('/onboarding/team')
   }
 
   if (!selectedPlan) {
@@ -458,7 +577,7 @@ const RegistrationPage: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Personal *
+                    Email *
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -478,6 +597,9 @@ const RegistrationPage: React.FC = () => {
                       {errors.email[0]}
                     </p>
                   )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    Este email se usará tanto para tu cuenta personal como para la organización
+                  </p>
                 </div>
 
                 <div>
@@ -625,54 +747,28 @@ const RegistrationPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email del Negocio *
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <input
-                        type="email"
-                        value={formData.businessEmail}
-                        onChange={(e) => handleInputChange('businessEmail', e.target.value)}
-                        className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                          errors.businessEmail ? 'border-red-300' : 'border-gray-300'
-                        }`}
-                        placeholder="contacto@tunegocio.com"
-                      />
-                    </div>
-                    {errors.businessEmail && (
-                      <p className="mt-1 text-sm text-red-600 flex items-center">
-                        <AlertCircle className="w-4 h-4 mr-1" />
-                        {errors.businessEmail[0]}
-                      </p>
-                    )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Teléfono del Negocio *
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="tel"
+                      value={formData.businessPhone}
+                      onChange={(e) => handleInputChange('businessPhone', e.target.value)}
+                      className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                        errors.businessPhone ? 'border-red-300' : 'border-gray-300'
+                      }`}
+                      placeholder="+56 2 1234 5678"
+                    />
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Teléfono del Negocio *
-                    </label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <input
-                        type="tel"
-                        value={formData.businessPhone}
-                        onChange={(e) => handleInputChange('businessPhone', e.target.value)}
-                        className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                          errors.businessPhone ? 'border-red-300' : 'border-gray-300'
-                        }`}
-                        placeholder="+56 2 1234 5678"
-                      />
-                    </div>
-                    {errors.businessPhone && (
-                      <p className="mt-1 text-sm text-red-600 flex items-center">
-                        <AlertCircle className="w-4 h-4 mr-1" />
-                        {errors.businessPhone[0]}
-                      </p>
-                    )}
-                  </div>
+                  {errors.businessPhone && (
+                    <p className="mt-1 text-sm text-red-600 flex items-center">
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                      {errors.businessPhone[0]}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -799,7 +895,7 @@ const RegistrationPage: React.FC = () => {
                 className="flex items-center px-6 py-3 text-gray-600 hover:text-gray-800 transition-colors"
               >
                 <ArrowLeft className="w-5 h-5 mr-2" />
-                Volver al Plan
+                Volver al Equipo
               </button>
 
               <button
@@ -811,11 +907,11 @@ const RegistrationPage: React.FC = () => {
                 {isLoading ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    Creando cuenta...
+                    Creando cuenta y configurando todo...
                   </>
                 ) : (
                   <>
-                    Continuar al Equipo
+                    Crear Cuenta y Completar Configuración
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </>
                 )}

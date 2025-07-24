@@ -101,16 +101,35 @@ class AvailabilityCalculationService:
         
         # Verificar tiempo mínimo de anticipación
         min_notice = timedelta(minutes=self.schedule.min_booking_notice)
-        if target_datetime < timezone.now() + min_notice:
+        current_time = timezone.now()
+        
+        # Handle naive vs timezone-aware datetime comparison
+        if timezone.is_naive(target_datetime) and timezone.is_aware(current_time):
+            current_time = timezone.make_naive(current_time)
+        elif timezone.is_aware(target_datetime) and timezone.is_naive(current_time):
+            current_time = timezone.make_aware(current_time)
+            
+        if target_datetime < current_time + min_notice:
             return False, f"Se requiere al menos {self.schedule.min_booking_notice} minutos de anticipación"
         
         # Verificar tiempo máximo de anticipación
         max_advance = timedelta(minutes=self.schedule.max_booking_advance)
-        if target_datetime > timezone.now() + max_advance:
+        if target_datetime > current_time + max_advance:
             return False, f"No se puede reservar con más de {self.schedule.max_booking_advance} minutos de anticipación"
         
-        target_date = target_datetime.date()
-        target_time = target_datetime.time()
+        # Convert to professional's timezone for proper time comparison
+        import pytz
+        professional_tz = pytz.timezone(self.schedule.timezone)
+        target_datetime_local = target_datetime.astimezone(professional_tz)
+        
+        target_date = target_datetime_local.date()
+        target_time = target_datetime_local.time()
+        
+        print(f"DEBUG AvailabilityService: target_datetime (original) = {target_datetime}")
+        print(f"DEBUG AvailabilityService: target_datetime_local = {target_datetime_local}")
+        print(f"DEBUG AvailabilityService: target_date = {target_date}")
+        print(f"DEBUG AvailabilityService: target_time = {target_time}")
+        print(f"DEBUG AvailabilityService: professional timezone = {self.schedule.timezone}")
         
         # Verificar excepciones de horario
         exception = self._get_schedule_exception(target_date)
@@ -124,8 +143,12 @@ class AvailabilityCalculationService:
         # Verificar horario de trabajo
         if not exception or exception.exception_type != 'special_hours':
             working_hours = self._get_working_hours_for_date(target_date)
+            print(f"DEBUG AvailabilityService: working_hours = {working_hours}")
             if not self._is_time_in_working_hours(target_time, working_hours):
+                print(f"DEBUG AvailabilityService: Time {target_time} is NOT in working hours {working_hours}")
                 return False, "Fuera del horario de trabajo"
+            else:
+                print(f"DEBUG AvailabilityService: Time {target_time} is in working hours {working_hours}")
         
         # Verificar descansos
         if self._is_time_in_break(target_time, target_date):

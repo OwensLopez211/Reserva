@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { 
   DollarSign, 
@@ -17,111 +17,123 @@ import {
   XCircle,
   AlertCircle,
   ChevronRight,
-  Activity
+  Activity,
+  Loader2,
+  RefreshCw
 } from 'lucide-react'
+import dashboardService, { DashboardData, DashboardAppointment } from '../../services/dashboardService'
 
-interface Appointment {
-  id: string
-  time: string
-  client: {
-    name: string
-    avatar?: string
-  }
-  service: string
-  professional: {
-    name: string
-    avatar?: string
-  }
-  status: 'confirmed' | 'pending' | 'completed' | 'cancelled'
-  duration: string
-  price: number
+interface LoadingState {
+  dashboard: boolean
+  appointments: boolean
+}
+
+interface ErrorState {
+  dashboard: string | null
+  appointments: string | null
 }
 
 const OwnerDashboardPage: React.FC = () => {
   const { user } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+  const [appointments, setAppointments] = useState<DashboardAppointment[]>([])
+  const [loading, setLoading] = useState<LoadingState>({
+    dashboard: true,
+    appointments: true
+  })
+  const [error, setError] = useState<ErrorState>({
+    dashboard: null,
+    appointments: null
+  })
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
 
-  // Datos de ejemplo - en una app real vendrían del backend
-  const stats = {
-    revenue: 2850000,
-    monthlyGrowth: 12,
-    clients: 156,
-    newClients: 8,
-    todayAppointments: 45,
-    completedToday: 38,
-    occupancy: 78
-  }
-
-  const teamStats = {
-    totalProfessionals: 8,
-    activeToday: 6,
-    avgRating: 4.8
-  }
-
-  // Datos de ejemplo para las citas
-  const appointments: Appointment[] = [
-    {
-      id: '1',
-      time: '09:00',
-      client: { name: 'María González' },
-      service: 'Corte y Peinado',
-      professional: { name: 'Ana Martínez' },
-      status: 'confirmed',
-      duration: '45 min',
-      price: 35000
-    },
-    {
-      id: '2',
-      time: '09:30',
-      client: { name: 'Carlos Pérez' },
-      service: 'Masaje Relajante',
-      professional: { name: 'Luis Rodríguez' },
-      status: 'completed',
-      duration: '60 min',
-      price: 45000
-    },
-    {
-      id: '3',
-      time: '10:15',
-      client: { name: 'Sofia Chen' },
-      service: 'Manicure Francesa',
-      professional: { name: 'Carla Torres' },
-      status: 'pending',
-      duration: '30 min',
-      price: 25000
-    },
-    {
-      id: '4',
-      time: '11:00',
-      client: { name: 'Roberto Silva' },
-      service: 'Corte Masculino',
-      professional: { name: 'Miguel Ángel' },
-      status: 'confirmed',
-      duration: '30 min',
-      price: 20000
-    },
-    {
-      id: '5',
-      time: '11:30',
-      client: { name: 'Elena Morales' },
-      service: 'Tratamiento Facial',
-      professional: { name: 'Patricia López' },
-      status: 'cancelled',
-      duration: '90 min',
-      price: 65000
-    },
-    {
-      id: '6',
-      time: '14:00',
-      client: { name: 'Diego Vargas' },
-      service: 'Corte y Barba',
-      professional: { name: 'Ana Martínez' },
-      status: 'confirmed',
-      duration: '45 min',
-      price: 40000
+  // Load dashboard data
+  const loadDashboardData = useCallback(async (forceRefresh = false) => {
+    try {
+      setLoading(prev => ({ ...prev, dashboard: true }))
+      setError(prev => ({ ...prev, dashboard: null }))
+      
+      const data = await dashboardService.getDashboardStats(forceRefresh)
+      setDashboardData(data)
+      setAppointments(data.upcoming_appointments)
+      setLastRefresh(new Date())
+    } catch (error) {
+      console.error('Error loading dashboard data:', error)
+      setError(prev => ({ ...prev, dashboard: 'Error al cargar datos del dashboard' }))
+    } finally {
+      setLoading(prev => ({ ...prev, dashboard: false, appointments: false }))
     }
-  ]
+  }, [])
+
+  // Load filtered appointments
+  const loadFilteredAppointments = useCallback(async () => {
+    try {
+      setLoading(prev => ({ ...prev, appointments: true }))
+      setError(prev => ({ ...prev, appointments: null }))
+      
+      const today = new Date().toISOString().split('T')[0]
+      const filtered = await dashboardService.getFilteredAppointments(
+        today,
+        statusFilter,
+        searchTerm
+      )
+      setAppointments(filtered)
+    } catch (error) {
+      console.error('Error loading appointments:', error)
+      setError(prev => ({ ...prev, appointments: 'Error al cargar citas' }))
+    } finally {
+      setLoading(prev => ({ ...prev, appointments: false }))
+    }
+  }, [statusFilter, searchTerm])
+
+  // Initial load
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
+
+  // Reload appointments when filters change
+  useEffect(() => {
+    if (dashboardData) {
+      loadFilteredAppointments()
+    }
+  }, [searchTerm, statusFilter, dashboardData])
+
+  // Auto refresh every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      dashboardService.refreshInBackground()
+    }, 5 * 60 * 1000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  // Handle manual refresh
+  const handleRefresh = useCallback(() => {
+    loadDashboardData(true)
+  }, [loadDashboardData])
+
+  // Memoized stats calculation
+  const stats = useMemo(() => {
+    return dashboardData ? {
+      revenue: dashboardData.month_stats.total_revenue,
+      monthlyGrowth: dashboardData.month_stats.revenue_growth,
+      clients: dashboardData.clients_stats.total_clients,
+      newClients: dashboardData.clients_stats.new_clients_this_week,
+      todayAppointments: dashboardData.today_stats.total_appointments,
+      completedToday: dashboardData.today_stats.completed_appointments,
+      occupancy: dashboardData.occupancy_percentage
+    } : {
+      revenue: 0,
+      monthlyGrowth: 0,
+      clients: 0,
+      newClients: 0,
+      todayAppointments: 0,
+      completedToday: 0,
+      occupancy: 0
+    }
+  }, [dashboardData])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -168,13 +180,47 @@ const OwnerDashboardPage: React.FC = () => {
     }
   }
 
-  const filteredAppointments = appointments.filter(appointment => {
-    const matchesSearch = appointment.client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         appointment.service.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         appointment.professional.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || appointment.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  // Memoized filtered appointments
+  const filteredAppointments = useMemo(() => {
+    return appointments.filter(appointment => {
+      const matchesSearch = appointment.client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           appointment.service.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           appointment.professional.name.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesStatus = statusFilter === 'all' || appointment.status === statusFilter
+      return matchesSearch && matchesStatus
+    })
+  }, [appointments, searchTerm, statusFilter])
+
+  // Show loading state
+  if (loading.dashboard && !dashboardData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">Cargando dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error.dashboard && !dashboardData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
+        <div className="text-center">
+          <div className="bg-red-50 border border-red-200 text-red-800 px-6 py-4 rounded-lg mb-4">
+            {error.dashboard}
+          </div>
+          <button
+            onClick={() => loadDashboardData(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
@@ -184,7 +230,7 @@ const OwnerDashboardPage: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
-                ¡Hola, {user?.first_name || user?.username}! 👋
+                ¡Hola, {user?.first_name || user?.username}!
               </h1>
               <p className="text-gray-600 mt-1">
                 Gestiona tu negocio desde aquí
@@ -196,6 +242,15 @@ const OwnerDashboardPage: React.FC = () => {
               )}
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={handleRefresh}
+                disabled={loading.dashboard}
+                className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white/80 hover:bg-white rounded-xl transition-colors shadow-sm border border-gray-200/50 disabled:opacity-50"
+                title="Actualizar datos"
+              >
+                <RefreshCw className={`h-4 w-4 text-gray-600 ${loading.dashboard ? 'animate-spin' : ''}`} />
+                <span className="text-sm text-gray-600">Actualizar</span>
+              </button>
               <button className="hidden sm:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl">
                 <Plus className="h-4 w-4" />
                 Nueva Cita
@@ -219,15 +274,19 @@ const OwnerDashboardPage: React.FC = () => {
                 <div className="p-3 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl shadow-lg">
                   <DollarSign className="h-6 w-6 text-white" />
                 </div>
-                <div className="flex items-center text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                <div className={`flex items-center text-xs font-medium px-2 py-1 rounded-full ${
+                  stats.monthlyGrowth >= 0 
+                    ? 'text-emerald-600 bg-emerald-50' 
+                    : 'text-red-600 bg-red-50'
+                }`}>
                   <TrendingUp className="h-3 w-3 mr-1" />
-                  +{stats.monthlyGrowth}%
+                  {dashboardService.formatPercentage(stats.monthlyGrowth)}
                 </div>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-600 mb-1">Ingresos del mes</p>
                 <p className="text-2xl lg:text-3xl font-bold text-gray-900 mb-1">
-                  ${stats.revenue.toLocaleString('es-CL')}
+                  {dashboardService.formatCurrency(stats.revenue)}
                 </p>
                 <p className="text-xs text-gray-500">vs mes anterior</p>
               </div>
@@ -369,7 +428,7 @@ const OwnerDashboardPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{appointment.service}</div>
-                      <div className="text-xs text-gray-500">${appointment.price.toLocaleString('es-CL')}</div>
+                      <div className="text-xs text-gray-500">{dashboardService.formatCurrency(appointment.price)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -380,9 +439,9 @@ const OwnerDashboardPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(appointment.status)}`}>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${dashboardService.getStatusColor(appointment.status)}`}>
                         {getStatusIcon(appointment.status)}
-                        {getStatusText(appointment.status)}
+                        {dashboardService.getStatusText(appointment.status)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -413,9 +472,9 @@ const OwnerDashboardPage: React.FC = () => {
                           <h3 className="text-sm font-semibold text-gray-900 truncate">
                             {appointment.client.name}
                           </h3>
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(appointment.status)} ml-2 flex-shrink-0`}>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${dashboardService.getStatusColor(appointment.status)} ml-2 flex-shrink-0`}>
                             {getStatusIcon(appointment.status)}
-                            {getStatusText(appointment.status)}
+                            {dashboardService.getStatusText(appointment.status)}
                           </span>
                         </div>
                         
@@ -439,7 +498,7 @@ const OwnerDashboardPage: React.FC = () => {
                             </div>
                             <div className="flex items-center text-sm font-medium text-green-600 ml-2">
                               <DollarSign className="h-3 w-3 mr-1" />
-                              <span>${appointment.price.toLocaleString('es-CL')}</span>
+                              <span>{dashboardService.formatCurrency(appointment.price)}</span>
                             </div>
                           </div>
                         </div>

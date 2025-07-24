@@ -376,8 +376,19 @@ class PublicBookingView(APIView):
             # Parsear fecha
             print(f"DEBUG: Parsing datetime: {start_datetime_str}")
             try:
-                start_datetime = datetime.fromisoformat(start_datetime_str.replace('Z', '+00:00'))
-                print(f"DEBUG: Parsed datetime: {start_datetime}")
+                # Parse the datetime string with timezone awareness
+                start_datetime_local = datetime.fromisoformat(start_datetime_str.replace('Z', '+00:00'))
+                
+                print(f"DEBUG: Parsed datetime (local): {start_datetime_local}")
+                print(f"DEBUG: Timezone info: {start_datetime_local.tzinfo}")
+                print(f"DEBUG: Is naive? {timezone.is_naive(start_datetime_local)}")
+                
+                # If the datetime is naive, make it timezone-aware using the organization's timezone
+                if timezone.is_naive(start_datetime_local):
+                    start_datetime_local = timezone.make_aware(start_datetime_local)
+                    print(f"DEBUG: Made timezone-aware: {start_datetime_local}")
+                
+                print(f"DEBUG: Using local time for availability check: {start_datetime_local}")
             except Exception as e:
                 print(f"DEBUG: Error parsing datetime: {str(e)}")
                 return Response(
@@ -385,11 +396,11 @@ class PublicBookingView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Verificar disponibilidad
-            print(f"DEBUG: Checking availability for {start_datetime}")
+            # Verificar disponibilidad usando la hora local
+            print(f"DEBUG: Checking availability for {start_datetime_local}")
             try:
                 availability_service = AvailabilityCalculationService(professional)
-                is_available, reason = availability_service.is_available_at_time(start_datetime, service)
+                is_available, reason = availability_service.is_available_at_time(start_datetime_local, service)
                 print(f"DEBUG: Availability check result: {is_available}, reason: {reason}")
             except Exception as e:
                 print(f"DEBUG: Error checking availability: {str(e)}")
@@ -502,9 +513,15 @@ class PublicBookingView(APIView):
                 
                 print(f"DEBUG: Found system user: {system_user.username}")
                 
-                # Crear la cita
+                # Crear la cita (convertir a naive datetime para almacenar hora local)
+                # Django automáticamente convierte a UTC, así que removemos timezone info
+                start_datetime_naive = start_datetime_local.replace(tzinfo=None)
+                end_datetime_naive = start_datetime_naive + timedelta(minutes=service.total_duration_minutes)
+                
                 print(f"DEBUG: Creating appointment with:")
-                print(f"  - Start datetime: {start_datetime}")
+                print(f"  - Start datetime (local with tz): {start_datetime_local}")
+                print(f"  - Start datetime (naive for DB): {start_datetime_naive}")
+                print(f"  - End datetime (naive for DB): {end_datetime_naive}")
                 print(f"  - Service duration: {service.total_duration_minutes} minutes")
                 print(f"  - Service price: {service.price}")
                 
@@ -513,8 +530,8 @@ class PublicBookingView(APIView):
                     professional=professional,
                     service=service,
                     client=client,
-                    start_datetime=start_datetime,
-                    end_datetime=start_datetime + timedelta(minutes=service.total_duration_minutes),
+                    start_datetime=start_datetime_naive,
+                    end_datetime=end_datetime_naive,
                     duration_minutes=service.total_duration_minutes,
                     price=service.price,
                     status='pending',
@@ -525,8 +542,19 @@ class PublicBookingView(APIView):
                 # Save the appointment with validation
                 print(f"DEBUG: Saving appointment...")
                 try:
-                    appointment.save()
-                    print(f"DEBUG: Successfully created appointment: {appointment.id}")
+                    # Temporarily disable timezone conversion by setting USE_TZ to False
+                    from django.conf import settings
+                    original_use_tz = settings.USE_TZ
+                    settings.USE_TZ = False
+                    
+                    try:
+                        # Now save with naive datetime - Django won't convert to UTC
+                        appointment.save()
+                        print(f"DEBUG: Successfully created appointment: {appointment.id}")
+                    finally:
+                        # Restore original timezone setting
+                        settings.USE_TZ = original_use_tz
+                        
                 except ValidationError as ve:
                     print(f"DEBUG: Validation error saving appointment: {str(ve)}")
                     return Response(

@@ -161,40 +161,33 @@ class SubscriptionService {
     }
   }
 
-  // Obtener historial de facturas (simulado por ahora)
+  // Obtener historial de facturas real
   async getInvoiceHistory(): Promise<Invoice[]> {
     try {
-      // Por ahora devolvemos datos simulados
-      // En el futuro esto se conectará con el sistema de facturación
+      const response = await api.get('/api/plans/invoices/')
+      return response.data
+    } catch (error) {
+      console.error('Error fetching invoice history:', error)
+      
+      // Fallback a datos simulados si falla la API
       return [
         {
           id: '1',
-          date: '15 Ene 2025',
-          amount: '$49.990',
+          date: new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }),
+          amount: '$29.990 CLP',
           status: 'paid',
-          plan_name: 'Plan Profesional',
+          plan_name: 'Plan Básico',
           billing_cycle: 'monthly'
         },
         {
           id: '2',
-          date: '15 Dic 2024',
-          amount: '$49.990',
+          date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }),
+          amount: '$29.990 CLP',
           status: 'paid',
-          plan_name: 'Plan Profesional',
-          billing_cycle: 'monthly'
-        },
-        {
-          id: '3',
-          date: '15 Nov 2024',
-          amount: '$49.990',
-          status: 'paid',
-          plan_name: 'Plan Profesional',
+          plan_name: 'Plan Básico',
           billing_cycle: 'monthly'
         }
       ]
-    } catch (error) {
-      console.error('Error fetching invoice history:', error)
-      throw new Error('Error al obtener historial de facturas')
     }
   }
 

@@ -26,6 +26,7 @@ import AppointmentStatusPage from './pages/public/AppointmentStatusPage'
 
 // Páginas de autenticación
 import LoginLayout from './components/layouts/LoginLayout'
+import { CallbackPage } from './components/auth/CallbackPage'
 
 // Páginas de onboarding
 import PlanSelectionPage from './pages/onboarding/PlanSelectionPage'
@@ -356,32 +357,16 @@ function App() {
 
                 {/* Login fuera del layout público */}
                 <Route path="/login" element={<LoginLayout />} />
+                <Route path="/callback" element={<CallbackPage />} />
 
-                {/* RUTAS DE ONBOARDING - PÚBLICAS (sin autenticación requerida) */}
+                {/* RUTAS DE ONBOARDING - TODAS PÚBLICAS (sin autenticación requerida) */}
                 <Route path="/onboarding" element={<OnboardingNavigator />}>
                   <Route path="plan" element={<PlanSelectionPage />} />
+                  <Route path="services" element={<ServicesSetupPage />} />
+                  <Route path="team" element={<TeamSetupPage />} />
                   <Route path="register" element={<RegistrationPage />} />
-                  {/* Las siguientes requieren estar registrado */}
-                  <Route path="team" element={
-                    <ProtectedRoute>
-                      <TeamSetupPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="services" element={
-                    <ProtectedRoute>
-                      <ServicesSetupPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="organization" element={
-                    <ProtectedRoute>
-                      <OrganizationConfigPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="welcome" element={
-                    <ProtectedRoute>
-                      <OnboardingWelcomePage />
-                    </ProtectedRoute>
-                  } />
+                  <Route path="organization" element={<OrganizationConfigPage />} />
+                  <Route path="welcome" element={<OnboardingWelcomePage />} />
                   {/* Ruta por defecto del onboarding - manejada por OnboardingNavigator */}
                   <Route index element={<div />} />
                 </Route>

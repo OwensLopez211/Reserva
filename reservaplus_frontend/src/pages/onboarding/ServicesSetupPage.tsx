@@ -16,8 +16,8 @@ const ServicesSetupPage: React.FC = () => {
     removeService,
     organizationData,
     canProceedFromStep,
-    completeOnboarding,
-    isCompleting,
+    markStepCompleted,
+    setCurrentStep,
     registrationToken,
     professionals
   } = useOnboarding()
@@ -27,15 +27,8 @@ const ServicesSetupPage: React.FC = () => {
   const [showSuggested, setShowSuggested] = useState(true)
   const [completionError, setCompletionError] = useState<string>('')
 
-  // Verificar token de registro pero NO cargar servicios automáticamente
+  // Log para ver el estado del contexto al cargar
   useEffect(() => {
-    if (!registrationToken) {
-      navigate('/onboarding/plan')
-      return
-    }
-    // NO cargar servicios automáticamente - el usuario debe elegir
-    
-    // Log para ver el estado del contexto al cargar
     console.log('🔍 ServicesSetupPage cargado - Estado del contexto:', {
       organizationData,
       professionals: professionals.length,
@@ -43,7 +36,7 @@ const ServicesSetupPage: React.FC = () => {
       services: services.length,
       registrationToken: !!registrationToken
     })
-  }, [registrationToken, navigate, organizationData, professionals, services])
+  }, [organizationData, professionals, services, registrationToken])
 
   const getIndustryTerms = () => {
     const terms: {[key: string]: {service: string, services: string}} = {
@@ -172,50 +165,31 @@ const ServicesSetupPage: React.FC = () => {
 
     setIsLoading(true)
     try {
-      console.log('🎯 Iniciando finalización del onboarding...')
-      console.log('📊 Estado actual del contexto:', {
-        organizationData,
-        professionals: professionals.length,
-        professionalDetails: professionals,
-        services: services.length,
-        serviceDetails: services,
-        registrationToken
-      })
+      console.log('🎯 Avanzando al siguiente paso (Equipo)...')
       
-      // Completar el onboarding (esto llama al backend)
-      await completeOnboarding()
+      // Marcar este paso como completado
+      markStepCompleted(1) // Paso 1 (servicios)
+      setCurrentStep(2) // Avanzar al paso 2 (equipo)
       
-      console.log('✅ Onboarding completado exitosamente')
-      
-      // Navegar al dashboard después del éxito
-      navigate('/dashboard', { replace: true })
+      // Navegar al siguiente paso
+      navigate('/onboarding/team')
       
          } catch (error: unknown) {
-       console.error('❌ Error al finalizar onboarding:', error)
+       console.error('❌ Error al avanzar:', error)
        
-       // Manejar diferentes tipos de errores
-       const errorMessage = error instanceof Error ? error.message : String(error)
        
-       if (errorMessage.includes('Token')) {
-         setCompletionError('Sesión expirada. Por favor, reinicia el proceso de registro.')
-       } else if (errorMessage.includes('Datos inválidos')) {
-         setCompletionError('Algunos datos no son válidos. Revisa la información ingresada.')
-       } else if (errorMessage.includes('límite')) {
-         setCompletionError('Has excedido los límites de tu plan. Ajusta la cantidad de servicios.')
-       } else {
-         setCompletionError(errorMessage || 'Error al completar el registro. Por favor, intenta de nuevo.')
-       }
+       setCompletionError('Error al procesar los servicios. Por favor, intenta de nuevo.')
     } finally {
       setIsLoading(false)
     }
   }
 
   const handleBack = () => {
-    navigate('/onboarding/team')
+    navigate('/onboarding/plan')
   }
 
   const industryTerms = getIndustryTerms()
-  const canProceed = canProceedFromStep(3) // Step 3 es Services
+  const canProceed = canProceedFromStep(1) // Step 1 es Services
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-cyan-50 to-blue-50">
@@ -556,26 +530,26 @@ const ServicesSetupPage: React.FC = () => {
         <div className="flex justify-between">
           <button
             onClick={handleBack}
-            disabled={isLoading || isCompleting}
+            disabled={isLoading}
             className="flex items-center px-6 py-3 text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
-            Volver al Equipo
+            Volver al Plan
           </button>
 
           <button
             onClick={handleSubmit}
-            disabled={isLoading || isCompleting || services.length === 0}
+            disabled={isLoading || services.length === 0}
             className="flex items-center px-8 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
-            {(isLoading || isCompleting) ? (
+            {isLoading ? (
               <>
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                {isCompleting ? 'Finalizando registro...' : 'Validando...'}
+                Guardando servicios...
               </>
             ) : (
               <>
-                Finalizar Configuración
+                Continuar al Equipo
                 <ArrowRight className="w-5 h-5 ml-2" />
               </>
             )}

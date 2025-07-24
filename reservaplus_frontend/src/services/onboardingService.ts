@@ -1,6 +1,6 @@
-// src/services/onboardingService.ts - VERSIÓN ALINEADA CON BACKEND REFACTORIZADO
+// src/services/onboardingService.ts - VERSIÓN ALINEADA CON AWS LAMBDA
 
-import { api } from './api'
+import { NativeCognitoService } from './nativeCognitoService'
 
 // Interfaces que coinciden exactamente con el backend refactorizado
 export interface OnboardingCompleteData {
@@ -98,6 +98,8 @@ export interface SignupResponse {
 }
 
 export class OnboardingService {
+  private static API_BASE = import.meta.env.VITE_API_GATEWAY_URL;
+  private static cognitoService = new NativeCognitoService();
   
   /**
    * PASO 1: Iniciar el proceso de signup con plan seleccionado
@@ -121,23 +123,33 @@ export class OnboardingService {
         }
       }
 
-      console.log('🚀 Iniciando signup:', signupData)
-      const response = await api.post('/api/plans/signup/', signupData)
+      console.log('🚀 Iniciando signup con AWS Lambda:', signupData)
       
-      console.log('✅ Signup exitoso:', response.data)
+      const response = await fetch(`${this.API_BASE}/auth/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(signupData)
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Signup failed')
+      }
+      
+      const data = await response.json()
+      console.log('✅ Signup exitoso:', data)
       
       // Guardar token temporal en localStorage
-      localStorage.setItem('registration_token', response.data.registration_token)
-      localStorage.setItem('signup_data', JSON.stringify(response.data))
+      localStorage.setItem('registration_token', data.registration_token)
+      localStorage.setItem('signup_data', JSON.stringify(data))
       
-      return response.data
+      return data
     } catch (error: unknown) {
       console.error('❌ Error en signup:', error)
-      if (typeof error === 'object' && error !== null && 'response' in error) {
-        const errObj = error as { response?: { data?: { error?: string } } }
-        if (errObj.response?.data?.error) {
-          throw new Error(errObj.response.data.error)
-        }
+      if (error instanceof Error) {
+        throw error
       }
       throw new Error('Error al iniciar el registro')
     }
@@ -148,12 +160,23 @@ export class OnboardingService {
    */
   static async completeOnboarding(data: OnboardingCompleteData): Promise<OnboardingCompleteResponse> {
     try {
-      console.log('🔄 Completando onboarding con endpoint refactorizado:', JSON.stringify(data, null, 2))
+      console.log('🔄 Completando onboarding con AWS Lambda:', JSON.stringify(data, null, 2))
       
-      // Usar el endpoint refactorizado
-      const response = await api.post('/api/onboarding/complete/', data)
+      const response = await fetch(`${this.API_BASE}/onboarding/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      })
       
-      console.log('✅ Onboarding completado exitosamente:', response.data)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Onboarding completion failed')
+      }
+      
+      const responseData = await response.json()
+      console.log('✅ Onboarding completado exitosamente:', responseData)
       
       // Limpiar datos temporales
       localStorage.removeItem('registration_token')
@@ -161,67 +184,12 @@ export class OnboardingService {
       localStorage.removeItem('onboarding_progress')
       localStorage.removeItem('plan_selection')
       
-      return response.data
+      return responseData
     } catch (error: unknown) {
       console.error('❌ Error completando onboarding:', error)
       
-      if (typeof error === 'object' && error !== null && 'response' in error) {
-        const errObj = error as { 
-          response?: { 
-            data?: { 
-              error?: string
-              details?: unknown
-              message?: string
-            }
-            status?: number
-            statusText?: string
-          } 
-        }
-        
-        // Log completo del error para debugging
-        if (errObj.response) {
-          console.error('💥 Error response completo:', {
-            status: errObj.response.status,
-            statusText: errObj.response.statusText,
-            data: errObj.response.data
-          })
-        }
-        
-        // Manejo específico de errores del backend refactorizado
-        if (errObj.response?.data?.error) {
-          throw new Error(errObj.response.data.error)
-        }
-        
-        if (errObj.response?.data?.message) {
-          throw new Error(errObj.response.data.message)
-        }
-        
-        if (errObj.response?.status === 400) {
-          const details = errObj.response.data?.details
-          if (details) {
-            throw new Error(`Error de validación: ${JSON.stringify(details, null, 2)}`)
-          } else {
-            throw new Error(`Datos inválidos: ${JSON.stringify(errObj.response.data, null, 2)}`)
-          }
-        }
-        
-        if (errObj.response?.status === 401) {
-          throw new Error('Token de registro inválido o expirado')
-        }
-        
-        if (errObj.response?.status === 403) {
-          throw new Error('No tienes permisos para realizar esta acción')
-        }
-        
-        if (errObj.response?.status === 429) {
-          throw new Error('Demasiados intentos. Por favor, espera un momento antes de intentar nuevamente.')
-        }
-        
-        if (errObj.response?.status === 500) {
-          throw new Error('Error interno del servidor. Por favor, intenta más tarde.')
-        }
-        
-        throw new Error(`Error ${errObj.response?.status}: ${errObj.response?.statusText || 'Error desconocido'}`)
+      if (error instanceof Error) {
+        throw error
       }
       
       throw new Error('Error de conexión al completar el onboarding')
@@ -293,8 +261,14 @@ export class OnboardingService {
     expires_at?: string
   }> {
     try {
-      const response = await api.get(`/api/plans/registration/${token}/`)
-      return response.data
+      const response = await fetch(`${this.API_BASE}/auth/registration/${token}`)
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to check registration status')
+      }
+      
+      return response.json()
     } catch (error) {
       console.error('Error verificando estado de registro:', error)
       throw new Error('Error al verificar el estado del registro')
@@ -309,28 +283,148 @@ export class OnboardingService {
     organizationData?: unknown
   }> {
     try {
-      // Verificar si ya tiene organización configurada
-      const orgResponse = await api.get('/api/organizations/me/')
+      // Check if user is authenticated
+      if (!this.cognitoService.isAuthenticated()) {
+        return { needsOnboarding: true }
+      }
+
+      // Get current user's ID token
+      const idToken = this.cognitoService.getIdToken()
+      if (!idToken) {
+        return { needsOnboarding: true }
+      }
       
-      if (orgResponse.status === 200 && orgResponse.data.onboarding_completed) {
-        return { needsOnboarding: false, organizationData: orgResponse.data }
+      const response = await fetch(`${this.API_BASE}/auth/user-status`, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        // If can't check status, assume needs onboarding
+        return { needsOnboarding: true }
+      }
+      
+      const data = await response.json()
+      
+      return {
+        needsOnboarding: data.needsOnboarding,
+        organizationData: data.organizationData
       }
     } catch (error) {
       console.log('Usuario necesita onboarding:', error)
+      return { needsOnboarding: true }
     }
-    
-    return { needsOnboarding: true }
   }
 
   /**
-   * Obtener planes disponibles
+   * Obtener planes disponibles desde AWS Lambda
    */
   static async getAvailablePlans() {
     try {
-      const response = await api.get('/api/plans/plans/')
-      return response.data
+      console.log('🔍 Obteniendo planes desde AWS Lambda...')
+      console.log('🔗 API_BASE:', this.API_BASE)
+      console.log('🔗 Full URL:', `${this.API_BASE}/plans`)
+      
+      // TEMPORAL: Usar planes hardcodeados mientras se soluciona CORS
+      console.log('⚠️ Usando planes hardcodeados temporalmente')
+      
+      const hardcodedPlans = {
+        results: [
+          {
+            id: 'basico',
+            name: 'Plan Básico',
+            price_monthly: 0,
+            price_yearly: 0,
+            description: 'Ideal para empezar tu negocio',
+            features: [
+              'Hasta 50 citas por mes',
+              '1 profesional',
+              '3 servicios',
+              'Agenda básica',
+              'Recordatorios por email',
+              'Soporte básico'
+            ],
+            is_popular: false,
+            is_coming_soon: false,
+            badge_text: 'Gratis',
+            color_scheme: 'emerald'
+          },
+          {
+            id: 'profesional',
+            name: 'Plan Profesional',
+            price_monthly: 29900,
+            price_yearly: 299000,
+            original_price: 359000,
+            discount_text: '17% OFF',
+            description: 'Para negocios en crecimiento',
+            features: [
+              'Citas ilimitadas',
+              'Hasta 5 profesionales',
+              'Servicios ilimitados',
+              'Agenda avanzada',
+              'Recordatorios por SMS',
+              'Reportes básicos',
+              'Integración con pagos',
+              'Soporte prioritario'
+            ],
+            is_popular: true,
+            is_coming_soon: false,
+            badge_text: 'Más Popular',
+            color_scheme: 'blue'
+          },
+          {
+            id: 'empresarial',
+            name: 'Plan Empresarial',
+            price_monthly: 59900,
+            price_yearly: 599000,
+            original_price: 719000,
+            discount_text: '17% OFF',
+            description: 'Para equipos grandes y múltiples ubicaciones',
+            features: [
+              'Todo en Plan Profesional',
+              'Profesionales ilimitados',
+              'Múltiples ubicaciones',
+              'Agenda compartida',
+              'Reportes avanzados',
+              'API personalizada',
+              'Integración completa',
+              'Soporte dedicado 24/7'
+            ],
+            is_popular: false,
+            is_coming_soon: false,
+            badge_text: 'Enterprise',
+            color_scheme: 'purple'
+          }
+        ],
+        count: 3
+      }
+      
+      console.log('✅ Planes hardcodeados cargados:', hardcodedPlans)
+      return hardcodedPlans
+      
+      /* TODO: Descomentar cuando CORS esté funcionando
+      const response = await fetch(`${this.API_BASE}/plans`, {
+        method: 'GET',
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to get plans')
+      }
+      
+      const data = await response.json()
+      console.log('✅ Planes obtenidos:', data)
+      
+      return data
+      */
     } catch (error) {
-      console.error('Error obteniendo planes:', error)
+      console.error('❌ Error obteniendo planes:', error)
       throw new Error('Error al cargar los planes')
     }
   }

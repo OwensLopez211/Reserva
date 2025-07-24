@@ -116,9 +116,9 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   // Mapeo de pasos a URLs - ACTUALIZADO
   const stepToUrlMap = {
     0: '/onboarding/plan',
-    1: '/onboarding/register', 
+    1: '/onboarding/services', 
     2: '/onboarding/team',
-    3: '/onboarding/services',
+    3: '/onboarding/register',
     4: '/onboarding/organization',
     5: '/onboarding/welcome'
   }
@@ -181,7 +181,9 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
 
   // Obtener URL del paso actual
   const navigateToCurrentStep = useCallback((): string => {
-    return stepToUrlMap[currentStep as keyof typeof stepToUrlMap] || '/onboarding/plan'
+    const url = stepToUrlMap[currentStep as keyof typeof stepToUrlMap] || '/onboarding/plan'
+    console.log('🎯 navigateToCurrentStep - currentStep:', currentStep, '→ URL:', url)
+    return url
   }, [currentStep])
 
   // Inicializar desde token de registro
@@ -363,12 +365,12 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     switch (step) {
       case 0: // Plan selection
         return !!planInfo
-      case 1: // Registration
-        return !!registrationToken && !!planInfo
+      case 1: // Services setup
+        return services.length > 0 && services.every(s => s.name && s.price > 0 && s.duration_minutes > 0)
       case 2: // Team setup
         return professionals.length > 0 && professionals.every(p => p.name && p.email)
-      case 3: // Services setup
-        return services.length > 0 && services.every(s => s.name && s.price > 0 && s.duration_minutes > 0)
+      case 3: // Registration
+        return !!registrationToken && !!planInfo
       case 4: // Organization config
         return !!(organizationData.name && organizationData.email && organizationData.phone)
       case 5: // Welcome/Complete

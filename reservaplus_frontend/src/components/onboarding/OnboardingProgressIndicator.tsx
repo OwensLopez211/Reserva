@@ -9,9 +9,9 @@ export const OnboardingProgressIndicator: React.FC = () => {
 
   const steps = [
     { id: 0, title: 'Plan', icon: '📋' },
-    { id: 1, title: 'Registro', icon: '👤' },
+    { id: 1, title: 'Servicios', icon: '🔧' },
     { id: 2, title: 'Equipo', icon: '👥' },
-    { id: 3, title: 'Servicios', icon: '🔧' },
+    { id: 3, title: 'Registro', icon: '👤' },
     { id: 4, title: 'Organización', icon: '🏢' },
     { id: 5, title: 'Finalizar', icon: '🎉' }
   ]

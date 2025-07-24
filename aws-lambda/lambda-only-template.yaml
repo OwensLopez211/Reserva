@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ReservaPlus Lambda Function Only
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+  S3Bucket:
+    Type: String
+    Description: S3 bucket containing Lambda code
+
+Resources:
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "reservaplus-lambda-role-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Scan
+                Resource: 
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/reservaplus-dev"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/reservaplus-dev/*"
+
+  # Get Available Plans Lambda
+  GetAvailablePlansFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "reservaplus-get-plans-${Environment}"
+      Runtime: nodejs18.x
+      Handler: index.handler
+      Code:
+        S3Bucket: !Ref S3Bucket
+        S3Key: get-plans.zip
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: reservaplus-dev
+          ENVIRONMENT: !Ref Environment
+      Timeout: 30
+
+Outputs:
+  LambdaFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt GetAvailablePlansFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaArn"
+      
+  LambdaFunctionName:
+    Description: Lambda function name
+    Value: !Ref GetAvailablePlansFunction
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaName"

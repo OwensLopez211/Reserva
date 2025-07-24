@@ -66,22 +66,22 @@ class SubscriptionLimitsMiddleware(MiddlewareMixin):
         Validar límites antes de procesar la request
         """
         # SIEMPRE hacer log para debugging
-        print(f"\n🔍 MIDDLEWARE DEBUG: {request.method} {request.path_info}")
-        logger.debug(f"🔍 MIDDLEWARE: Processing request: {request.method} {request.path_info}")
+        print(f"\n[MIDDLEWARE DEBUG] {request.method} {request.path_info}")
+        logger.debug(f"[MIDDLEWARE] Processing request: {request.method} {request.path_info}")
         
         # Verificar si la URL está en la lista de excluidas
         path = request.path_info
         for pattern in self.EXCLUDED_PATTERNS:
             if path.startswith(pattern):
-                print(f"✅ URL {path} is excluded from validation (pattern: {pattern})")
+                print(f"[OK] URL {path} is excluded from validation (pattern: {pattern})")
                 return None
         
         # Solo validar en métodos POST (creación) - otros métodos pueden pasar libremente
         if request.method not in ['POST', 'PUT', 'PATCH']:
-            print(f"❌ Method {request.method} doesn't require validation, skipping")
+            print(f"[SKIP] Method {request.method} doesn't require validation, skipping")
             return None
         
-        print(f"✅ POST request detected")
+        print(f"[OK] POST request detected")
         
         # Solo validar si el usuario está autenticado
         if not hasattr(request, 'user'):

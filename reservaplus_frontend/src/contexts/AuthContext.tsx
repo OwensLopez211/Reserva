@@ -1,35 +1,22 @@
-// src/contexts/AuthContext.tsx - JWT CORREGIDO PARA LOADING INFINITO
+// src/contexts/AuthContext.tsx - Native AWS Cognito Integration
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { api, tokenManager } from '../services/api'
+import { NativeCognitoService } from '../services/nativeCognitoService'
 
 export interface User {
   id: string
-  username: string
   email: string
-  first_name: string
-  last_name: string
-  full_name: string
-  phone: string
-  role: 'owner' | 'admin' | 'staff' | 'professional' | 'reception'
-  is_professional: boolean
-  organization: string
-  organization_name: string
-  is_active_in_org: boolean
-  date_joined: string
-  last_login: string
-  last_login_local: string
-  created_at: string
-  updated_at: string
+  name: string
+  organization_id?: string
+  role?: string
+  onboarding_completed?: boolean
 }
 
 interface AuthContextType {
   user: User | null
   loading: boolean
-  login: (username: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   isAuthenticated: boolean
-  hasRole: (roles: string | string[]) => boolean
-  canAccess: (permission: string) => boolean
   checkAuth: () => Promise<void>
 }
 
@@ -42,107 +29,71 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isCheckingAuth, setIsCheckingAuth] = useState(false) // Prevenir múltiples calls
+  const cognitoService = new NativeCognitoService()
 
-  // Verificar si hay un token válido al cargar la aplicación
+  // Check for existing session on mount
   useEffect(() => {
-    checkAuthStatus()
+    checkAuth()
   }, [])
 
-  const checkAuthStatus = async () => {
-    // Prevenir múltiples llamadas simultáneas
-    if (isCheckingAuth) {
-      console.log('Ya se está verificando autenticación, ignorando...')
-      return
-    }
-
-    setIsCheckingAuth(true)
-    
+  // Check authentication status
+  const checkAuth = async () => {
     try {
-      const token = tokenManager.getAccessToken()
-      if (!token) {
-        console.log('No hay token de acceso')
-        setUser(null)
-        return
+      setLoading(true)
+      
+      if (cognitoService.isAuthenticated()) {
+        const userInfo = await cognitoService.getCurrentUser()
+        if (userInfo) {
+          console.log('Usuario autenticado:', userInfo)
+          setUser({
+            id: userInfo.sub,
+            email: userInfo.email,
+            name: userInfo.name
+          })
+        }
       }
-
-      console.log('Verificando token de acceso...')
-      const response = await api.get('/api/auth/me/')
-      console.log('Usuario autenticado:', response.data)
-      setUser(response.data)
-    } catch (error: unknown) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'response' in error
-      ) {
-        const errObj = error as { response?: { status?: number } };
-        console.log('Token inválido o expirado:', errObj.response?.status);
-      }
-      tokenManager.clearTokens();
-      setUser(null);
+    } catch (error) {
+      console.log('No hay sesión activa:', error)
+      setUser(null)
     } finally {
       setLoading(false)
-      setIsCheckingAuth(false)
     }
   }
 
-  const login = async (username: string, password: string) => {
+  // Login function
+  const login = async (email: string, password: string) => {
     try {
-      console.log('Intentando login con JWT...')
-      const response = await api.post('/api/auth/login/', {
-        username,
-        password
-      })
+      setLoading(true)
+      console.log('Iniciando login con Native Cognito...')
       
-      const { user: userData, access_token, refresh_token } = response.data
+      const tokens = await cognitoService.login({ email, password })
+      const userInfo = await cognitoService.getCurrentUser()
       
-      console.log('Login exitoso:', userData)
-      console.log('Tokens recibidos - Access:', access_token ? 'Sí' : 'No', 'Refresh:', refresh_token ? 'Sí' : 'No')
-      
-      // Guardar tokens en localStorage
-      tokenManager.setTokens(access_token, refresh_token)
-      
-      setUser(userData)
-      setLoading(false) // Importante: parar loading después del login
-    } catch (error: unknown) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'response' in error
-      ) {
-        const errObj = error as { response?: { data?: { error?: string } } };
-        console.error('Error en login:', errObj.response?.data);
-        if (errObj.response?.data?.error) {
-          throw new Error(errObj.response.data.error);
-        }
-      } else {
-        console.error('Error en login:', error);
+      if (userInfo) {
+        console.log('Login exitoso:', userInfo)
+        setUser({
+          id: userInfo.sub,
+          email: userInfo.email,
+          name: userInfo.name
+        })
       }
-      throw new Error('Error al iniciar sesión');
+    } catch (error) {
+      console.error('Error en login:', error)
+      throw error
+    } finally {
+      setLoading(false)
     }
   }
 
+  // Logout function
   const logout = async () => {
     console.log('🚪 AuthContext: Iniciando logout...')
     
     try {
-      console.log('📡 Notificando logout al servidor...')
-      // Notificar al servidor (opcional para JWT)
-      await api.post('/api/auth/logout/')
-      console.log('✅ Servidor notificado del logout')
-    } catch (error) {
-      console.log('⚠️ Error al notificar logout al servidor (continuando con limpieza local):', error)
-    }
-    
-    // SIEMPRE limpiar datos locales, sin importar si el servidor respondió
-    try {
-      console.log('🧹 Limpiando tokens y datos locales...')
+      // Logout from Cognito
+      await cognitoService.logout()
       
-      // Limpiar tokens del localStorage
-      tokenManager.clearTokens()
-      
-      // Limpiar TODOS los datos de sesión y onboarding
+      // Clear local data
       const keysToRemove = [
         'registration_form_data',
         'selected_plan_data', 
@@ -150,7 +101,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         'services_setup_data',
         'organization_config_data',
         'onboarding_step',
-        'completed_steps'
+        'completed_steps',
+        'onboarding_progress',
+        'registration_token'
       ]
       
       keysToRemove.forEach(key => {
@@ -158,54 +111,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log(`🗑️ Removido: ${key}`)
       })
       
-      // Limpiar estado del usuario
+      // Clear user state
       setUser(null)
-      setLoading(false)
       
       console.log('✅ Logout completado - todos los datos eliminados')
-      console.log('📍 Estado final del localStorage:', {
-        access_token: localStorage.getItem('access_token'),
-        refresh_token: localStorage.getItem('refresh_token'),
-        registration_data: localStorage.getItem('registration_form_data')
-      })
       
-    } catch (cleanupError) {
-      console.error('❌ Error durante limpieza local:', cleanupError)
-      // Fallback: limpiar completamente el localStorage
+    } catch (error) {
+      console.error('❌ Error durante logout:', error)
+      // Fallback cleanup
       localStorage.clear()
       setUser(null)
-      setLoading(false)
       console.log('🧹 Fallback: localStorage completamente limpiado')
     }
-  }
-
-  // Función expuesta para verificar auth manualmente - CON PROTECCIÓN
-  const checkAuth = async () => {
-    if (!isCheckingAuth) {
-      await checkAuthStatus()
-    }
-  }
-
-  // Función para verificar roles
-  const hasRole = (roles: string | string[]): boolean => {
-    if (!user) return false
-    const roleArray = Array.isArray(roles) ? roles : [roles]
-    return roleArray.includes(user.role)
-  }
-
-  // Función para verificar permisos específicos
-  const canAccess = (permission: string): boolean => {
-    if (!user) return false
-    
-    const permissions: Record<string, string[]> = {
-      'owner': ['view_all', 'edit_all', 'delete_all', 'manage_organization', 'view_reports', 'manage_users'],
-      'admin': ['view_all', 'edit_all', 'delete_own', 'view_reports', 'manage_users'],
-      'staff': ['view_own', 'edit_own', 'view_clients', 'create_appointments'],
-      'professional': ['view_own', 'edit_own', 'view_appointments', 'view_clients'],
-      'reception': ['view_all', 'edit_appointments', 'create_appointments', 'view_clients', 'manage_schedule'],
-    }
-    
-    return permissions[user.role]?.includes(permission) || false
   }
 
   const value = {
@@ -214,8 +131,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     logout,
     isAuthenticated: !!user,
-    hasRole,
-    canAccess,
     checkAuth
   }
 

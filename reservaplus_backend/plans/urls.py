@@ -3,6 +3,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
+from .invoice_views import InvoiceHistoryView
 
 router = DefaultRouter()
 router.register(r'plans', views.PlanViewSet, basename='plan')
@@ -20,6 +21,9 @@ urlpatterns = [
     # Mi suscripción
     path('subscription/me/', views.MySubscriptionView.as_view(), name='my-subscription'),
     path('subscription/me/usage/', views.MySubscriptionUsageView.as_view(), name='my-subscription-usage'),
+    
+    # Historial de facturas
+    path('invoices/', InvoiceHistoryView.as_view(), name='invoice-history'),
     
     # Router URLs (incluye /plans/)
     path('', include(router.urls)),

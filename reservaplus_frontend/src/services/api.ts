@@ -1,4 +1,4 @@
-// src/services/api.ts - CON JWT
+// src/services/api.ts - CON AWS COGNITO OIDC
 import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
@@ -10,58 +10,55 @@ export const api = axios.create({
   },
 })
 
-// Funciones para manejar tokens
+// Funciones para manejar tokens con Cognito
 export const tokenManager = {
-  getAccessToken: () => localStorage.getItem('access_token'),
-  getRefreshToken: () => localStorage.getItem('refresh_token'),
-  setTokens: (accessToken: string, refreshToken: string) => {
-    localStorage.setItem('access_token', accessToken)
-    localStorage.setItem('refresh_token', refreshToken)
-    console.log('🔑 Tokens guardados en localStorage')
+  getAccessToken: async () => {
+    try {
+      return await cognitoService.getAccessToken()
+    } catch (error) {
+      console.error('Error getting access token:', error)
+      return null
+    }
   },
-  clearTokens: () => {
-    console.log('🗑️ Limpiando tokens del localStorage...')
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-    
-    // Verificar que realmente se eliminaron
-    const accessToken = localStorage.getItem('access_token')
-    const refreshToken = localStorage.getItem('refresh_token')
-    
-    if (accessToken || refreshToken) {
-      console.error('⚠️ Error: Los tokens no se eliminaron correctamente')
-      console.log('Access token restante:', accessToken)
-      console.log('Refresh token restante:', refreshToken)
-      
-      // Forzar eliminación
-      try {
-        localStorage.clear()
-        console.log('🧹 localStorage completamente limpiado como fallback')
-      } catch (error) {
-        console.error('❌ Error al limpiar localStorage:', error)
-      }
-    } else {
-      console.log('✅ Tokens eliminados correctamente')
+  getIdToken: async () => {
+    try {
+      return await cognitoService.getIdToken()
+    } catch (error) {
+      console.error('Error getting ID token:', error)
+      return null
+    }
+  },
+  clearTokens: async () => {
+    try {
+      await cognitoService.logout()
+      console.log('✅ Tokens de Cognito eliminados correctamente')
+    } catch (error) {
+      console.error('❌ Error al eliminar tokens de Cognito:', error)
     }
   }
 }
 
 // Interceptor para requests - agregar token de autorización
 api.interceptors.request.use(
-  (config) => {
-    const token = tokenManager.getAccessToken()
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+  async (config) => {
+    try {
+      const token = await tokenManager.getAccessToken()
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+      }
+      
+      console.log('API Request:', {
+        url: config.url,
+        method: config.method,
+        headers: config.headers,
+        hasToken: !!token
+      })
+      
+      return config
+    } catch (error) {
+      console.error('Error in request interceptor:', error)
+      return config
     }
-    
-    console.log('API Request:', {
-      url: config.url,
-      method: config.method,
-      headers: config.headers,
-      hasToken: !!token
-    })
-    
-    return config
   },
   (error) => {
     return Promise.reject(error)
@@ -86,41 +83,28 @@ api.interceptors.response.use(
       message: error.message
     })
     
-    // Si es 401 y no hemos intentado renovar el token ya
+    // Si es 401, intentar renovar la sesión de Cognito
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
       
-      const refreshToken = tokenManager.getRefreshToken()
-      if (refreshToken) {
-        try {
-          console.log('Intentando renovar token...')
-          const response = await axios.post(`${API_BASE_URL}/api/auth/refresh/`, {
-            refresh_token: refreshToken
-          })
-          
-          const newAccessToken = response.data.access_token
-          tokenManager.setTokens(newAccessToken, refreshToken)
-          
+      try {
+        console.log('Intentando renovar sesión de Cognito...')
+        const newTokens = await cognitoService.refreshSession()
+        
+        if (newTokens) {
           // Reintentar request original con nuevo token
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
+          originalRequest.headers.Authorization = `Bearer ${newTokens.accessToken}`
           return api(originalRequest)
-        } catch (refreshError) {
-          console.log('Error renovando token, limpiando sesión y redirigiendo a login')
-          console.error('Refresh token error:', refreshError)
-          tokenManager.clearTokens()
-          // Limpiar datos de onboarding también
-          localStorage.removeItem('registration_form_data')
-          localStorage.removeItem('selected_plan_data')
-          localStorage.removeItem('team_setup_data')
-          localStorage.removeItem('services_setup_data')
-          localStorage.removeItem('organization_config_data')
-          
-          if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/onboarding')) {
-            window.location.href = '/login'
-          }
+        } else {
+          throw new Error('No se pudo renovar la sesión')
         }
-      } else {
-        console.log('No hay refresh token, limpiando sesión y redirigiendo a login')
+      } catch (refreshError) {
+        console.log('Error renovando sesión, limpiando y redirigiendo a login')
+        console.error('Refresh session error:', refreshError)
+        
+        // Limpiar sesión de Cognito
+        await tokenManager.clearTokens()
+        
         // Limpiar datos de onboarding también
         localStorage.removeItem('registration_form_data')
         localStorage.removeItem('selected_plan_data')

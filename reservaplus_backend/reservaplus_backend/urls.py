@@ -29,6 +29,9 @@ urlpatterns = [
         # Schedule
         path('schedule/', include('schedule.urls')),
         
+        # Payments (MercadoPago)
+        path('payments/', include('payments.urls')),
+        
         # API Rest Framework (para navegación)
         path('', include('rest_framework.urls')),
     ])),
