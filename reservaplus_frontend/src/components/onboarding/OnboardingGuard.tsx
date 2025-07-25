@@ -3,7 +3,7 @@
 import React from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { useOnboardingStatus } from '../../contexts/OnboardingContext'
+import { useOnboarding } from '../../contexts/OnboardingContext'
 
 interface OnboardingGuardProps {
   children: React.ReactNode
@@ -11,7 +11,7 @@ interface OnboardingGuardProps {
 
 export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) => {
   const { isAuthenticated } = useAuth()
-  const { needsOnboarding, loading } = useOnboardingStatus()
+  const { needsOnboarding, loading } = useOnboarding()
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />

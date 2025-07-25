@@ -2,3 +2,6 @@ reservaplus_backend/.env
 /reservaplus_backend/.env
 /reservaplus_backend/venv
 /Onboarding/
+aws-lambda
+reservaplus_frontend/src/services/onboardingStatusApi.ts
+reservaplus_frontend/src/services/userAccessService.ts
