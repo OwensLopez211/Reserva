@@ -16,6 +16,9 @@ urlpatterns = [
     # Mi organización
     path('me/', views.MyOrganizationView.as_view(), name='my-organization'),
     
+    # Dashboard
+    path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
+    
     # Router URLs
     path('', include(router.urls)),
     

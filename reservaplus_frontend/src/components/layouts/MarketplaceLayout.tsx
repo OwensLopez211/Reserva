@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import MarketplaceNavbar from '../marketplace/MarketplaceNavbar'
-import MarketplaceFooter from '../marketplace/MarketplaceFooter'
+// import MarketplaceNavbar from '../marketplace/MarketplaceNavbar'
+// import MarketplaceFooter from '../marketplace/MarketplaceFooter'
 
 const MarketplaceLayout: React.FC = () => {
   const location = useLocation()
@@ -14,7 +14,7 @@ const MarketplaceLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Marketplace Navbar */}
-      <MarketplaceNavbar />
+
       
       {/* Main Content */}
       <main className="flex-1">
@@ -22,7 +22,6 @@ const MarketplaceLayout: React.FC = () => {
       </main>
       
       {/* Marketplace Footer */}
-      <MarketplaceFooter />
     </div>
   )
 }

@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
+import organizationService from '../../services/organizationService'
 import { 
   DollarSign, 
   Users, 
@@ -41,87 +42,46 @@ const OwnerDashboardPage: React.FC = () => {
   const { user } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [dashboardData, setDashboardData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Datos de ejemplo - en una app real vendrían del backend
-  const stats = {
-    revenue: 2850000,
-    monthlyGrowth: 12,
-    clients: 156,
-    newClients: 8,
-    todayAppointments: 45,
-    completedToday: 38,
-    occupancy: 78
-  }
-
-  const teamStats = {
-    totalProfessionals: 8,
-    activeToday: 6,
-    avgRating: 4.8
-  }
-
-  // Datos de ejemplo para las citas
-  const appointments: Appointment[] = [
-    {
-      id: '1',
-      time: '09:00',
-      client: { name: 'María González' },
-      service: 'Corte y Peinado',
-      professional: { name: 'Ana Martínez' },
-      status: 'confirmed',
-      duration: '45 min',
-      price: 35000
-    },
-    {
-      id: '2',
-      time: '09:30',
-      client: { name: 'Carlos Pérez' },
-      service: 'Masaje Relajante',
-      professional: { name: 'Luis Rodríguez' },
-      status: 'completed',
-      duration: '60 min',
-      price: 45000
-    },
-    {
-      id: '3',
-      time: '10:15',
-      client: { name: 'Sofia Chen' },
-      service: 'Manicure Francesa',
-      professional: { name: 'Carla Torres' },
-      status: 'pending',
-      duration: '30 min',
-      price: 25000
-    },
-    {
-      id: '4',
-      time: '11:00',
-      client: { name: 'Roberto Silva' },
-      service: 'Corte Masculino',
-      professional: { name: 'Miguel Ángel' },
-      status: 'confirmed',
-      duration: '30 min',
-      price: 20000
-    },
-    {
-      id: '5',
-      time: '11:30',
-      client: { name: 'Elena Morales' },
-      service: 'Tratamiento Facial',
-      professional: { name: 'Patricia López' },
-      status: 'cancelled',
-      duration: '90 min',
-      price: 65000
-    },
-    {
-      id: '6',
-      time: '14:00',
-      client: { name: 'Diego Vargas' },
-      service: 'Corte y Barba',
-      professional: { name: 'Ana Martínez' },
-      status: 'confirmed',
-      duration: '45 min',
-      price: 40000
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true)
+        const data = await organizationService.getDashboardData()
+        setDashboardData(data)
+        setError(null)
+      } catch (err) {
+        console.error('Error loading dashboard data:', err)
+        setError('Error al cargar los datos del dashboard')
+      } finally {
+        setLoading(false)
+      }
     }
-  ]
+
+    fetchDashboardData()
+  }, [])
+
+  // Usar datos reales o valores por defecto mientras carga
+  const stats = dashboardData?.stats || {
+    revenue: 0,
+    monthlyGrowth: 0,
+    clients: 0,
+    newClients: 0,
+    todayAppointments: 0,
+    completedToday: 0
+  }
+
+  const teamStats = dashboardData?.teamStats || {
+    totalProfessionals: 0,
+    activeToday: 0,
+    avgRating: 0
+  }
+
+  // Usar citas reales o arreglo vacío
+  const appointments: Appointment[] = dashboardData?.appointments || []
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -210,7 +170,7 @@ const OwnerDashboardPage: React.FC = () => {
 
       <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
         {/* Enhanced Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
           {/* Revenue Card */}
           <div className="group relative overflow-hidden bg-white rounded-2xl p-6 border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-emerald-200">
             <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 bg-gradient-to-br from-emerald-500/10 to-green-500/10 rounded-full"></div>
@@ -276,34 +236,29 @@ const OwnerDashboardPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Occupancy Card */}
-          <div className="group relative overflow-hidden bg-white rounded-2xl p-6 border border-gray-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-orange-200">
-            <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-full"></div>
-            <div className="relative">
-              <div className="flex items-start justify-between mb-4">
-                <div className="p-3 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shadow-lg">
-                  <Activity className="h-6 w-6 text-white" />
-                </div>
-                <div className="flex items-center text-xs font-medium text-orange-600 bg-orange-50 px-2 py-1 rounded-full">
-                  <TrendingUp className="h-3 w-3 mr-1" />
-                  {stats.occupancy}%
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Ocupación</p>
-                <p className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">{stats.occupancy}%</p>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-500" 
-                    style={{ width: `${stats.occupancy}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
+        {/* Loading and Error States */}
+        {loading && (
+          <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden p-8">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span className="ml-3 text-gray-600">Cargando datos del dashboard...</span>
+            </div>
+          </div>
+        )}
+        
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
+              <span className="text-red-700">{error}</span>
+            </div>
+          </div>
+        )}
+
         {/* Appointments Table - Full Width */}
+        {!loading && !error && (
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
           <div className="p-6 border-b border-gray-100">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -465,6 +420,7 @@ const OwnerDashboardPage: React.FC = () => {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   )

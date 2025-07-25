@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
   Star,
   MapPin,
@@ -25,7 +25,6 @@ import BookingModal from '../../components/public/BookingModal'
 const OrganizationProfilePage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
-  const location = useLocation()
   
   const [organizationData, setOrganizationData] = useState<PublicOrganizationDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -42,16 +41,19 @@ const OrganizationProfilePage: React.FC = () => {
     }
   }, [slug])
 
-  // Detectar si estamos en la ruta de booking y abrir el modal automáticamente
+  // Detectar si se debe abrir el modal automáticamente
   useEffect(() => {
-    if (location.pathname.includes('/booking') && organizationData) {
-      // Abrir el modal de booking automáticamente con el primer servicio
+    const urlParams = new URLSearchParams(window.location.search)
+    const autoBook = urlParams.get('autobook')
+    
+    if (autoBook === 'true' && organizationData) {
+      // Abrir el modal automáticamente con el primer servicio
       const firstService = Object.values(organizationData.services_by_category)[0]?.[0]
       if (firstService) {
         handleBookService(firstService)
       }
     }
-  }, [location.pathname, organizationData])
+  }, [organizationData])
 
   const loadOrganizationData = async () => {
     if (!slug) return
@@ -160,19 +162,6 @@ const OrganizationProfilePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Minimal Header */}
-      <div className="border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <button
-            onClick={() => navigate('/marketplace')}
-            className="inline-flex items-center text-gray-500 hover:text-gray-700 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            <span className="text-sm font-medium">Volver</span>
-          </button>
-        </div>
-      </div>
-
       {/* Clean Hero Section */}
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="flex items-start space-x-8">
@@ -255,21 +244,13 @@ const OrganizationProfilePage: React.FC = () => {
                 </div>
               </div>
 
-              {/* CTA Button */}
-              <div className="ml-8">
-                <button
-                  onClick={() => setActiveTab('services')}
-                  className="px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
-                >
-                  Reservar cita
-                </button>
-              </div>
+              
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Content Tabs */}
       <div className="max-w-6xl mx-auto px-6 pb-12">
         {/* Simple Tabs */}
         <div className="border-b border-gray-200 mb-12">
@@ -330,9 +311,30 @@ const OrganizationProfilePage: React.FC = () => {
                                   {service.duration_minutes} min
                                 </div>
                                 <div className="font-semibold text-gray-900">
-                                  ${service.price}
+                                  {publicBookingService.formatPrice(service.price)}
                                 </div>
                               </div>
+
+                              {/* Professionals available for this service */}
+                              {service.professionals.length > 0 && (
+                                <div className="mt-4">
+                                  <p className="text-sm text-gray-600 mb-2">
+                                    Profesionales disponibles:
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {service.professionals.map((professional) => (
+                                      <button
+                                        key={professional.id}
+                                        onClick={() => handleBookService(service, professional)}
+                                        className="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-lg text-sm text-gray-700 flex items-center transition-colors"
+                                      >
+                                        <User className="h-3 w-3 mr-1" />
+                                        {professional.name}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                             <div className="ml-6">
                               <button
@@ -356,28 +358,23 @@ const OrganizationProfilePage: React.FC = () => {
             <div className="space-y-6">
               {professionals.map((professional) => (
                 <div key={professional.id} className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-4">
-                      <div className="h-12 w-12 bg-gray-100 rounded-full flex items-center justify-center">
-                        <User className="h-6 w-6 text-gray-400" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium text-gray-900 mb-1">{professional.name}</h3>
-                        {professional.specialty && (
-                          <p className="text-sm text-gray-600 mb-3">{professional.specialty}</p>
-                        )}
-                        {professional.bio && (
-                          <p className="text-sm text-gray-600">{professional.bio}</p>
-                        )}
-                      </div>
+                  <div className="flex items-start space-x-4">
+                    <div className="h-12 w-12 bg-gray-100 rounded-full flex items-center justify-center">
+                      <User className="h-6 w-6 text-gray-400" />
                     </div>
-                    <div>
-                      <button
-                        onClick={() => handleBookService(services_by_category[Object.keys(services_by_category)[0]]?.[0], professional)}
-                        className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
-                      >
-                        Reservar
-                      </button>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-gray-900 mb-1">{professional.name}</h3>
+                      {professional.specialty && (
+                        <p className="text-sm text-gray-600 mb-3">{professional.specialty}</p>
+                      )}
+                      {professional.bio && (
+                        <p className="text-sm text-gray-600 mb-3">{professional.bio}</p>
+                      )}
+                      {professional.accepts_walk_ins && (
+                        <div className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-700">
+                          Acepta citas sin cita previa
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -393,15 +390,19 @@ const OrganizationProfilePage: React.FC = () => {
                   <p className="text-gray-600 leading-relaxed">{organization.description}</p>
                 </div>
               )}
-              
-              {organization.opening_hours && (
+
+              {/* Gallery */}
+              {organization.gallery_images && organization.gallery_images.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Horarios de atención</h3>
-                  <div className="space-y-3">
-                    {Object.entries(organization.opening_hours).map(([day, hours]) => (
-                      <div key={day} className="flex justify-between py-2 border-b border-gray-100 last:border-b-0">
-                        <span className="font-medium text-gray-900">{day}</span>
-                        <span className="text-gray-600">{hours}</span>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Galería</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {organization.gallery_images.map((image, index) => (
+                      <div key={index} className="aspect-square">
+                        <img
+                          src={image}
+                          alt={`${organization.name} - ${index + 1}`}
+                          className="w-full h-full object-cover rounded-lg border border-gray-200"
+                        />
                       </div>
                     ))}
                   </div>
@@ -411,7 +412,7 @@ const OrganizationProfilePage: React.FC = () => {
               {/* Company Stats */}
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Información general</h3>
-                <div className="grid grid-cols-3 gap-8">
+                <div className="grid grid-cols-2 gap-8">
                   <div className="text-center">
                     <div className="text-2xl font-semibold text-gray-900">
                       {Object.values(services_by_category).reduce((acc, services) => acc + services.length, 0)}
@@ -422,12 +423,6 @@ const OrganizationProfilePage: React.FC = () => {
                     <div className="text-2xl font-semibold text-gray-900">{professionals.length}</div>
                     <div className="text-sm text-gray-600">Profesionales</div>
                   </div>
-                  {organization.rating > 0 && (
-                    <div className="text-center">
-                      <div className="text-2xl font-semibold text-gray-900">{organization.rating.toFixed(1)}</div>
-                      <div className="text-sm text-gray-600">Calificación</div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -438,12 +433,11 @@ const OrganizationProfilePage: React.FC = () => {
       {/* Booking Modal */}
       {isBookingModalOpen && selectedService && (
         <BookingModal
-          isOpen={isBookingModalOpen}
-          onClose={handleCloseModal}
-          organization={organization}
+          organizationSlug={organization.slug}
           service={selectedService}
-          selectedProfessional={selectedProfessional}
+          preSelectedProfessional={selectedProfessional}
           onSuccess={handleBookingSuccess}
+          onClose={handleCloseModal}
         />
       )}
     </div>

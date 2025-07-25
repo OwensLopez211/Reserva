@@ -7,6 +7,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from django.db import models
+from django.db.models import Sum, Count, Q
+from django.utils import timezone
+from datetime import datetime, timedelta
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from core.pagination import CustomPageNumberPagination
@@ -23,6 +26,139 @@ from .serializers import (
     MarketplaceOrganizationSerializer,
     MarketplaceOrganizationDetailSerializer
 )
+
+
+class DashboardView(APIView):
+    """
+    Vista para obtener datos del dashboard del propietario
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        user = request.user
+        if not user.organization:
+            return Response({
+                'error': 'Usuario no pertenece a ninguna organización'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        organization = user.organization
+        
+        # Importar Appointment aquí para evitar imports circulares
+        from appointments.models import Appointment
+        
+        # Obtener fechas
+        today = timezone.now().date()
+        first_day_month = today.replace(day=1)
+        last_month_start = (first_day_month - timedelta(days=1)).replace(day=1)
+        last_month_end = first_day_month - timedelta(days=1)
+        
+        # ===== CÁLCULO DE INGRESOS (solo citas completadas) =====
+        current_month_appointments = Appointment.objects.filter(
+            organization=organization,
+            status='completed',
+            start_datetime__date__gte=first_day_month,
+            start_datetime__date__lte=today
+        )
+        
+        last_month_appointments = Appointment.objects.filter(
+            organization=organization,
+            status='completed',
+            start_datetime__date__gte=last_month_start,
+            start_datetime__date__lte=last_month_end
+        )
+        
+        current_month_revenue = current_month_appointments.aggregate(
+            total=Sum('price')
+        )['total'] or 0
+        
+        last_month_revenue = last_month_appointments.aggregate(
+            total=Sum('price')
+        )['total'] or 0
+        
+        # Calcular crecimiento mensual
+        if last_month_revenue > 0:
+            monthly_growth = ((current_month_revenue - last_month_revenue) / last_month_revenue) * 100
+        else:
+            monthly_growth = 100 if current_month_revenue > 0 else 0
+        
+        # ===== ESTADÍSTICAS DE CLIENTES =====
+        total_clients = Client.objects.filter(
+            organization=organization,
+            is_active=True
+        ).count()
+        
+        # Clientes nuevos esta semana
+        week_ago = today - timedelta(days=7)
+        new_clients_week = Client.objects.filter(
+            organization=organization,
+            created_at__date__gte=week_ago
+        ).count()
+        
+        # ===== ESTADÍSTICAS DE CITAS DE HOY =====
+        today_appointments = Appointment.objects.filter(
+            organization=organization,
+            start_datetime__date=today
+        )
+        
+        total_appointments_today = today_appointments.count()
+        completed_appointments_today = today_appointments.filter(
+            status='completed'
+        ).count()
+        
+        # ===== ESTADÍSTICAS DEL EQUIPO =====
+        total_professionals = Professional.objects.filter(
+            organization=organization,
+            is_active=True
+        ).count()
+        
+        # Profesionales activos hoy (que tienen citas)
+        active_professionals_today = Professional.objects.filter(
+            organization=organization,
+            is_active=True,
+            appointments__start_datetime__date=today
+        ).distinct().count()
+        
+        # Rating promedio (simulado por ahora)
+        avg_rating = 4.8
+        
+        # ===== OBTENER CITAS DE HOY PARA LA TABLA =====
+        today_appointments_detailed = today_appointments.select_related(
+            'client', 'professional', 'service'
+        ).order_by('start_datetime')[:20]  # Limitar a 20 citas
+        
+        appointments_data = []
+        for appointment in today_appointments_detailed:
+            appointments_data.append({
+                'id': str(appointment.id),
+                'time': appointment.start_datetime.strftime('%H:%M'),
+                'client': {
+                    'name': appointment.client.full_name
+                },
+                'service': appointment.service.name if appointment.service else 'Servicio eliminado',
+                'professional': {
+                    'name': appointment.professional.name
+                },
+                'status': appointment.status,
+                'duration': f"{appointment.duration_minutes} min",
+                'price': float(appointment.price)
+            })
+        
+        return Response({
+            'stats': {
+                'revenue': float(current_month_revenue),
+                'monthlyGrowth': round(monthly_growth, 1),
+                'clients': total_clients,
+                'newClients': new_clients_week,
+                'todayAppointments': total_appointments_today,
+                'completedToday': completed_appointments_today
+            },
+            'teamStats': {
+                'totalProfessionals': total_professionals,
+                'activeToday': active_professionals_today,
+                'avgRating': avg_rating
+            },
+            'appointments': appointments_data
+        })
 
 
 class MyOrganizationView(APIView):

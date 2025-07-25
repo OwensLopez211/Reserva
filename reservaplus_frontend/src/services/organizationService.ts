@@ -24,6 +24,19 @@ class OrganizationService {
   }
 
   /**
+   * Obtener datos del dashboard
+   */
+  async getDashboardData(): Promise<any> {
+    try {
+      const response = await api.get('/api/organizations/dashboard/');
+      return response.data;
+    } catch (error) {
+      console.error('Error obteniendo datos del dashboard:', error);
+      throw new Error('Error al cargar los datos del dashboard');
+    }
+  }
+
+  /**
    * Actualizar información de la organización
    */
   async updateOrganization(organizationData: OrganizationUpdateData): Promise<Organization> {

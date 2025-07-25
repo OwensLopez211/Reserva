@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import {
   FolderOpen,
-  FileText,
   Plus,
   Edit,
   Trash2,
@@ -10,17 +9,10 @@ import {
   Save,
   X,
   AlertCircle,
-  Clock,
-  User,
-  Tag,
-  Search,
-  Filter,
-  Calendar,
-  Star,
   MessageSquare,
   Paperclip,
   Eye,
-  MoreVertical
+  Search
 } from 'lucide-react'
 
 interface ClientNote {
@@ -59,8 +51,7 @@ const ClientFolderTab: React.FC<ClientFolderTabProps> = ({ clientId, clientName 
   const [activeSubTab, setActiveSubTab] = useState<TabType>('summary')
   const [notes, setNotes] = useState<ClientNote[]>([])
   const [files, setFiles] = useState<ClientFile[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error] = useState<string | null>(null)
   
   // Note management
   const [isCreateNoteOpen, setIsCreateNoteOpen] = useState(false)
@@ -73,7 +64,7 @@ const ClientFolderTab: React.FC<ClientFolderTabProps> = ({ clientId, clientName 
   })
 
   // File management
-  const [isUploadOpen, setIsUploadOpen] = useState(false)
+  // const [isUploadOpen, setIsUploadOpen] = useState(false) // No usado actualmente
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
 
@@ -428,7 +419,7 @@ const ClientFolderTab: React.FC<ClientFolderTabProps> = ({ clientId, clientName 
         </div>
 
         <button
-          onClick={() => setIsUploadOpen(true)}
+          onClick={() => {/* setIsUploadOpen(true) */}}
           className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
         >
           <Upload className="h-4 w-4" />
@@ -485,7 +476,15 @@ const ClientFolderTab: React.FC<ClientFolderTabProps> = ({ clientId, clientName 
   )
 
   return (
-    <div className="space-y-6">
+    <div className="relative">
+      {/* Overlay de función en progreso cubriendo todo el contenido */}
+      <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-auto" style={{minHeight: '100%', height: '100%', width: '100%'}}>
+        <div className="w-full h-full flex items-center justify-center backdrop-blur-md bg-white/80 dark:bg-gray-900/80">
+          <div className="border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg py-3 px-6 flex items-center justify-center text-gray-700 dark:text-gray-200 text-base font-semibold" style={{letterSpacing: '0.03em'}}>
+            🚧 Función en progreso
+          </div>
+        </div>
+      </div>
       {/* Error Alert */}
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center space-x-2">

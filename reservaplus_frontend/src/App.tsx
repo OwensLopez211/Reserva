@@ -21,7 +21,7 @@ import MarketplaceHomePage from './pages/marketplace/MarketplaceHomePage'
 import OrganizationProfilePage from './pages/marketplace/OrganizationProfilePage'
 
 // Páginas de reservas públicas
-import PublicOrganizationProfilePage from './pages/public/OrganizationProfilePage'
+import PublicOrganizationProfilePage from './pages/marketplace/OrganizationProfilePage'
 import AppointmentStatusPage from './pages/public/AppointmentStatusPage'
 
 // Páginas de autenticación
